@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-function getEnv(name: string, fallbacks: string[] = [], defaultValue?: string): string {
+function getEnv(name: string, fallbacks: string[] = [], defaultValue: string = ""): string {
   const names = [name, ...fallbacks];
   for (const n of names) {
     const val = process.env[n];
@@ -8,20 +8,17 @@ function getEnv(name: string, fallbacks: string[] = [], defaultValue?: string): 
       return val.trim();
     }
   }
-  if (defaultValue !== undefined) {
-    return defaultValue;
-  }
-  throw new Error(`Missing required env var: ${name}${fallbacks.length > 0 ? ` (or ${fallbacks.join(", ")})` : ""}`);
+  return defaultValue;
 }
 
 export const config = {
   supabase: {
-    url: getEnv("SUPABASE_URL", ["NEXT_PUBLIC_SUPABASE_URL"]),
+    url: getEnv("SUPABASE_URL", ["NEXT_PUBLIC_SUPABASE_URL"], "https://placeholder.supabase.co"),
     serviceRoleKey: getEnv("SUPABASE_SERVICE_ROLE_KEY", [
       "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "SUPABASE_ANON_KEY",
       "SUPABASE_KEY",
-    ]),
+    ], "placeholder_key"),
   },
   gemini: {
     apiKey: getEnv("GEMINI_API_KEY", [], ""),
