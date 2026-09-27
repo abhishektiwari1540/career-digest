@@ -1,3 +1,14 @@
+// Node.js DOM polyfills for PDF parsing libraries in Serverless environments
+if (typeof (globalThis as any).DOMMatrix === "undefined") {
+  (globalThis as any).DOMMatrix = class DOMMatrix {};
+}
+if (typeof (globalThis as any).Path2D === "undefined") {
+  (globalThis as any).Path2D = class Path2D {};
+}
+if (typeof (globalThis as any).ImageData === "undefined") {
+  (globalThis as any).ImageData = class ImageData {};
+}
+
 import express from "express";
 import fs from "fs";
 import multer from "multer";
@@ -5,7 +16,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
 import { config } from "./config.js";
 import { generateMultimodalEmbedding } from "./llm/embedding.js";
 import { getOrGenerateContentPack } from "./llm/contentEngine.js";
@@ -229,8 +239,14 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
         },
       });
     } else if (fileExt === ".pdf") {
-      const pdfData = await pdfParse(buffer);
-      extractedText = pdfData.text || "";
+      try {
+        const pdfParse = require("pdf-parse");
+        const pdfData = await pdfParse(buffer);
+        extractedText = pdfData.text || "";
+      } catch (pdfErr: any) {
+        console.warn("[server] PDF parse warning:", pdfErr.message);
+        extractedText = buffer.toString("utf-8");
+      }
       itemType = category === "auto" ? "resume_bio" : category;
 
       // Split PDF into clean paragraph chunks
