@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: career-digest-cronjob
+  namespace: default
+  labels:
+    app: career-digest
+spec:
+  # 03:00 UTC = 08:30 IST
+  schedule: "0 3 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: career-digest
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: career-digest-runner
+              image: ghcr.io/yourusername/career-digest:latest
+              imagePullPolicy: Always
+              envFrom:
+                - configMapRef:
+                    name: career-digest-config
+                - secretRef:
+                    name: career-digest-secret

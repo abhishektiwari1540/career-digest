@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: career-digest-config
+  namespace: default
+data:
+  GEMINI_MODEL: "gemini-3.6-flash"
+  ADZUNA_COUNTRY: "in"
+  ADZUNA_WHAT: "software developer"
+  ADZUNA_WHERE: "jaipur"
+  PROFILE_SKILLS: "typescript,node,react,postgres,rest-apis"
+  CANDIDATE_NAME: "Abhishek Tiwari"
+  CANDIDATE_LOCATION: "Jaipur, Rajasthan, India"

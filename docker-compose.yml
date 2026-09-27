@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  career-digest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: career-digest-app
+    env_file:
+      - .env
+    restart: "no"

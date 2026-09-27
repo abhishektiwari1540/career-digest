@@ -1,0 +1,44 @@
+{
+  "name": "career-digest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Daily career intelligence digest: legitimate job + trend + event feeds, scored with Gemini, stored in Supabase, delivered by email.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "node dist/server.js",
+    "start:daemon": "node dist/index.js --daemon",
+    "dev": "tsx src/server.ts",
+    "cli": "tsx src/index.ts",
+    "daemon": "tsx src/index.ts --daemon",
+    "server": "tsx src/server.ts",
+    "ui": "tsx src/server.ts",
+    "adk:test": "tsx src/testAdkAgent.ts",
+    "voice:test": "tsx src/testVoiceProfile.ts",
+    "import:linkedin": "tsx src/linkedinImport.ts"
+  },
+  "dependencies": {
+    "@google/adk": "^2.1.0",
+    "@google/genai": "^2.22.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@types/adm-zip": "^0.5.8",
+    "@types/node-cron": "^3.0.11",
+    "adm-zip": "^0.6.1",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "multer": "^2.4.0",
+    "node-cron": "^4.6.0",
+    "pdf-parse": "^2.4.5",
+    "resend": "^4.0.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@google/adk-devtools": "^2.1.0",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^20.14.10",
+    "@types/pdf-parse": "^1.1.5",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4"
+  }
+}

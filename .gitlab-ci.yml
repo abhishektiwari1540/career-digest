@@ -1,0 +1,42 @@
+stages:
+  - test
+  - build
+  - execute
+
+default:
+  image: node:20-slim
+
+cache:
+  paths:
+    - node_modules/
+
+test-and-compile:
+  stage: test
+  script:
+    - npm ci
+    - npm run build
+
+docker-build:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+    - docker build -t $CI_REGISTRY_IMAGE:latest .
+    - docker push $CI_REGISTRY_IMAGE:latest
+  only:
+    - main
+    - master
+
+scheduled-digest-run:
+  stage: execute
+  script:
+    - npm ci
+    - npm run build
+    - npm start
+  only:
+    - schedules
+    - web

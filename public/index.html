@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Second Brain - Data Ingestion & Knowledge Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="glow-bg glow-1"></div>
+  <div class="glow-bg glow-2"></div>
+
+  <div class="app-container">
+    <!-- Header Section -->
+    <header class="main-header">
+      <div class="brand">
+        <div class="logo-icon">🧠</div>
+        <div>
+          <h1>AI Second Brain</h1>
+          <p class="subtitle">Personal Knowledge Engine & Multi-Platform Auto-Posting Hub</p>
+        </div>
+      </div>
+      <div class="system-status">
+        <div class="status-badge live">
+          <span class="dot"></span> Gemini Embedding-2
+        </div>
+        <div class="status-badge live">
+          <span class="dot"></span> Supabase Vector Storage
+        </div>
+        <div class="status-badge active">
+          <span class="dot"></span> Auto-Post Engine
+        </div>
+      </div>
+    </header>
+
+    <!-- Metrics Bar -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">LinkedIn Posts Ingested</div>
+        <div class="metric-value" id="stat-linkedin-posts">0</div>
+        <div class="metric-foot">Shares.csv & Post History</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Second Brain Memories</div>
+        <div class="metric-value" id="stat-brain-memories">0</div>
+        <div class="metric-foot">Google Chat, Resumes, Notes</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Multimodal Vectors</div>
+        <div class="metric-value" id="stat-multimodal-vectors">0</div>
+        <div class="metric-foot">gemini-embedding-2 space</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Active Auto-Publishers</div>
+        <div class="metric-value" id="stat-publishers-count">8</div>
+        <div class="metric-foot">Dev.to, LinkedIn, Bluesky, Mastodon</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="tab-upload">
+        <span class="icon">📤</span> Ingest Data Files
+      </button>
+      <button class="tab-btn" data-tab="tab-explorer">
+        <span class="icon">🔍</span> Brain Explorer & Vector Search
+      </button>
+      <button class="tab-btn" data-tab="tab-content">
+        <span class="icon">🚀</span> AI Content Engine
+      </button>
+      <button class="tab-btn" data-tab="tab-platforms">
+        <span class="icon">🌐</span> Auto-Post Monitor
+      </button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+
+      <!-- TAB 1: UPLOAD CENTER -->
+      <section id="tab-upload" class="tab-content active">
+        <div class="section-card">
+          <div class="section-header">
+            <h2>📥 Ingest Knowledge Files into Second Brain</h2>
+            <p>Upload your <strong>LinkedIn Export (`Shares.csv`)</strong>, <strong>Google Chat Exports</strong>, <strong>Resumes/CVs (`.pdf`, `.txt`)</strong>, or <strong>Technical Research Notes</strong> to feed your personal AI memory.</p>
+          </div>
+
+          <form id="upload-form" class="upload-box">
+            <div class="form-row">
+              <label for="category-select">Data Category Focus:</label>
+              <select id="category-select" class="custom-select">
+                <option value="auto">✨ Auto-Detect File Category</option>
+                <option value="linkedin_zip_export">📦 Full LinkedIn Archive (.zip Export up to 100MB+)</option>
+                <option value="linkedin_export">💼 LinkedIn Data Export (Shares.csv / Posts)</option>
+                <option value="google_chat">💬 Google Chat / Slack Messages (.json, .txt)</option>
+                <option value="resume_bio">📄 Resume, CV & Bio (.pdf, .txt, .md)</option>
+                <option value="research_notes">🧠 Technical Research & Notes (.md, .txt)</option>
+                <option value="project_specs">🛠️ Project Specifications & Portfolio</option>
+              </select>
+            </div>
+
+            <!-- Dropzone -->
+            <div class="dropzone" id="dropzone">
+              <div class="dropzone-icon">📦</div>
+              <h3>Drag & Drop Data File or ZIP Archive Here</h3>
+              <p>Supports <strong>.zip</strong> (Full LinkedIn Archive), <strong>.csv</strong>, <strong>.json</strong>, <strong>.pdf</strong>, <strong>.txt</strong>, <strong>.md</strong> (Up to 150MB)</p>
+              <button type="button" class="btn secondary-btn" id="browse-btn">Choose File / Archive from Computer</button>
+              <input type="file" id="file-input" hidden accept=".zip,.csv,.json,.pdf,.txt,.md">
+              <div class="selected-file-name" id="selected-file-name"></div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn primary-btn" id="submit-upload-btn" disabled>
+                🚀 Process & Ingest into Second Brain
+              </button>
+            </div>
+          </form>
+
+          <!-- Upload Progress & Results -->
+          <div class="upload-progress-container" id="upload-progress" style="display: none;">
+            <div class="progress-header">
+              <span id="progress-status-text">Uploading & processing data...</span>
+              <span id="progress-percent">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="progress-fill"></div>
+            </div>
+          </div>
+
+          <div class="result-card" id="upload-result" style="display: none;">
+            <div class="result-header">
+              <span class="icon">✅</span>
+              <h4 id="result-title">File Ingested Successfully!</h4>
+            </div>
+            <div class="result-body">
+              <p id="result-message"></p>
+              <div class="result-details" id="result-details"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: BRAIN EXPLORER & VECTOR SEARCH -->
+      <section id="tab-explorer" class="tab-content">
+        <div class="section-card">
+          <div class="section-header">
+            <h2>🔎 Second Brain Knowledge Explorer</h2>
+            <p>Query your ingested data using <strong>gemini-embedding-2</strong> multimodal vector search.</p>
+          </div>
+
+          <!-- Vector Search Bar -->
+          <div class="search-box">
+            <input type="text" id="search-input" class="custom-input" placeholder="Type query e.g. 'Node.js architecture', 'PostgreSQL indexing', 'LinkedIn posts'...">
+            <button class="btn primary-btn" id="search-btn">Search Second Brain</button>
+          </div>
+
+          <div id="search-results-area" style="margin-top: 1.5rem; display: none;">
+            <h3 class="subsection-title">Vector Search Results (`gemini-embedding-2`)</h3>
+            <div class="results-grid" id="search-results-list"></div>
+          </div>
+
+          <!-- Filter Chips -->
+          <div class="filter-chips-bar" id="explorer-filter-chips">
+            <button class="chip-btn active" data-filter="all">✨ All Knowledge Items</button>
+            <button class="chip-btn" data-filter="career">💼 Work Experience</button>
+            <button class="chip-btn" data-filter="linkedin">📢 LinkedIn History</button>
+            <button class="chip-btn" data-filter="resume">📄 Resumes & Bio</button>
+            <button class="chip-btn" data-filter="notes">🧪 Research Notes</button>
+          </div>
+
+          <!-- Ingested Memories List -->
+          <div style="margin-top: 1.5rem;">
+            <h3 class="subsection-title">Recent Ingested Knowledge Items</h3>
+            <div class="memory-list" id="memories-container">
+              <p class="placeholder-text">Loading ingested brain items...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: AI CONTENT ENGINE -->
+      <section id="tab-content" class="tab-content">
+        <div class="section-card">
+          <div class="section-header">
+            <h2>🚀 AI Content Engine Generator</h2>
+            <p>Generates targeted post content packs for LinkedIn, Dev.to, X, and blogs based on your ingested second brain memory.</p>
+          </div>
+
+          <div class="content-gen-banner">
+            <div>
+              <h3>Generate 2-Day Content Pack</h3>
+              <p>Analyzes your past posts, research notes, and trending developer topics to draft high-engagement content.</p>
+            </div>
+            <button class="btn primary-btn" id="generate-pack-btn">
+              ⚡ Generate Content Pack Now
+            </button>
+          </div>
+
+          <div id="content-pack-output" style="margin-top: 2rem;">
+            <p class="placeholder-text">Click "Generate Content Pack Now" to build your social content pack.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: PLATFORM MONITOR -->
+      <section id="tab-platforms" class="tab-content">
+        <div class="section-card">
+          <div class="section-header">
+            <h2>🌐 Universal Auto-Post Platform Monitor</h2>
+            <p>Real-time configuration and status for zero-friction platform auto-posting adapters.</p>
+          </div>
+
+          <div class="platforms-grid" id="platforms-grid">
+            <div class="platform-card">
+              <div class="platform-head">
+                <span class="platform-name">Dev.to</span>
+                <span class="status-pill free">FREE / ZERO FRICTION</span>
+              </div>
+              <p>Direct API-key POST to `dev.to/api/articles`. No review required.</p>
+              <div class="platform-foot" id="plat-devto-status">Checking API Key...</div>
+            </div>
+
+            <div class="platform-card">
+              <div class="platform-head">
+                <span class="platform-name">LinkedIn Profile</span>
+                <span class="status-pill free">FREE / SELF-SERVE</span>
+              </div>
+              <p>Official Share API v2 (`w_member_social`). No partner review required for personal profile shares.</p>
+              <div class="platform-foot" id="plat-linkedin-status">Checking OAuth Token...</div>
+            </div>
+
+            <div class="platform-card">
+              <div class="platform-head">
+                <span class="platform-name">Bluesky</span>
+                <span class="status-pill free">FREE / OPEN</span>
+              </div>
+              <p>AT Protocol app-password authentication.</p>
+              <div class="platform-foot" id="plat-bluesky-status">Checking credentials...</div>
+            </div>
+
+            <div class="platform-card">
+              <div class="platform-head">
+                <span class="platform-name">Mastodon</span>
+                <span class="status-pill free">FREE / OPEN</span>
+              </div>
+              <p>Native REST API access token.</p>
+              <div class="platform-foot" id="plat-mastodon-status">Checking credentials...</div>
+            </div>
+
+            <div class="platform-card">
+              <div class="platform-head">
+                <span class="platform-name">YouTube Data API v3</span>
+                <span class="status-pill optimized">1 UNIT QUOTA OPTIMIZED</span>
+              </div>
+              <p>`videos.list` Category 28 Science & Tech (~3 units/day across IN, US, GB).</p>
+              <div class="platform-foot" id="plat-youtube-status">Quota Optimized (~1 unit/call)</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
