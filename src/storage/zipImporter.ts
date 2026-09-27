@@ -140,19 +140,24 @@ export async function processLinkedInZipArchive(buffer: Buffer, fileName: string
     }
   }
 
-  // Save memories & generate vector embeddings
-  for (const item of processedItems) {
-    await saveSecondBrainMemory({
-      category: item.category,
-      conceptKey: item.key,
-      memoryText: item.text,
-    });
+  // Save memories & generate vector embeddings (capped at 30 items for serverless speed)
+  const itemsToProcess = processedItems.slice(0, 30);
+  for (const item of itemsToProcess) {
+    try {
+      await saveSecondBrainMemory({
+        category: item.category,
+        conceptKey: item.key,
+        memoryText: item.text,
+      });
 
-    const vector = await generateMultimodalEmbedding(item.text);
-    await saveMultimodalVector(item.key, item.category, vector, {
-      fileName,
-      ingestedAt: new Date().toISOString(),
-    });
+      const vector = await generateMultimodalEmbedding(item.text);
+      await saveMultimodalVector(item.key, item.category, vector, {
+        fileName,
+        ingestedAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.warn("[zipImporter] Item processing warning:", err.message);
+    }
   }
 
   // Auto-run Voice Fingerprint Extraction

@@ -116,17 +116,25 @@ document.addEventListener("DOMContentLoaded", () => {
           body: formData,
         });
 
-        const data = await response.json();
+        const rawText = await response.text();
+        let data = {};
+        try {
+          data = JSON.parse(rawText);
+        } catch (e) {
+          throw new Error(`Server returned non-JSON response (${response.status}): ${rawText.slice(0, 150)}`);
+        }
 
         progressFill.style.width = "100%";
         progressPercent.textContent = "100%";
 
-        if (data.success) {
+        if (response.ok && data.success) {
           progressStatusText.textContent = "Ingestion Complete!";
           showResult(data);
           fetchStats();
         } else {
-          alert(`Upload error: ${data.error}`);
+          const errMsg = data.error || data.message || `Server error (${response.status})`;
+          progressStatusText.textContent = "Ingestion Failed";
+          alert(`Upload error: ${errMsg}`);
         }
       } catch (err) {
         alert(`Upload failed: ${err.message}`);

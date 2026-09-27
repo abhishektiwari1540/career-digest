@@ -361,23 +361,28 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
 
     parsedCount = processedItems.length;
 
-    // Process & Embed in parallel with vector embeddings
+    // Process & Embed (capped at 30 items for serverless speed)
     let vectorsGeneratedCount = 0;
-    for (const item of processedItems) {
-      // 1. Save to second_brain_memory table
-      await saveSecondBrainMemory({
-        category: item.category,
-        conceptKey: item.key,
-        memoryText: item.text,
-      });
+    const itemsToProcess = processedItems.slice(0, 30);
+    for (const item of itemsToProcess) {
+      try {
+        // 1. Save to second_brain_memory table
+        await saveSecondBrainMemory({
+          category: item.category,
+          conceptKey: item.key,
+          memoryText: item.text,
+        });
 
-      // 2. Generate gemini-embedding-2 Multimodal Vector Embedding
-      const vector = await generateMultimodalEmbedding(item.text);
-      await saveMultimodalVector(item.key, item.category, vector, {
-        fileName,
-        ingestedAt: new Date().toISOString(),
-      });
-      vectorsGeneratedCount++;
+        // 2. Generate gemini-embedding-2 Multimodal Vector Embedding
+        const vector = await generateMultimodalEmbedding(item.text);
+        await saveMultimodalVector(item.key, item.category, vector, {
+          fileName,
+          ingestedAt: new Date().toISOString(),
+        });
+        vectorsGeneratedCount++;
+      } catch (err: any) {
+        console.warn("[server] Item processing warning:", err.message);
+      }
     }
 
     console.log(`[server] Upload processed: ${fileName} (${parsedCount} items parsed, ${vectorsGeneratedCount} gemini-embedding-2 vectors created)`);
