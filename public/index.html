@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Second Brain - Data Ingestion & Knowledge Hub</title>
+  <title>AI Second Brain - Multimodal Vector Explorer & Self-Updating Engine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -20,7 +20,7 @@
         <div class="logo-icon">🧠</div>
         <div>
           <h1>AI Second Brain</h1>
-          <p class="subtitle">Personal Knowledge Engine & Multi-Platform Auto-Posting Hub</p>
+          <p class="subtitle">Personal Knowledge Engine, Grounded SEO & Self-Updating Growth Hub</p>
         </div>
       </div>
       <div class="system-status">
@@ -30,9 +30,12 @@
         <div class="status-badge live">
           <span class="dot"></span> Supabase Vector Storage
         </div>
-        <div class="status-badge active">
-          <span class="dot"></span> Auto-Post Engine
+        <div class="status-badge active" id="engine-status-badge">
+          <span class="dot"></span> ⚡ Self-Updating: <span id="engine-timer-display">Active (60s)</span>
         </div>
+        <button class="btn secondary-btn" id="force-sync-btn" title="Force Immediate Self-Update Cycle" style="padding:0.35rem 0.75rem; font-size:0.75rem; display:flex; align-items:center; gap:0.3rem;">
+          <span>🔄</span> Sync Now
+        </button>
       </div>
     </header>
 
@@ -54,6 +57,11 @@
         <div class="metric-foot">gemini-embedding-2 space</div>
       </div>
       <div class="metric-card">
+        <div class="metric-label">Reading Time Logged</div>
+        <div class="metric-value" id="stat-reading-time">0m</div>
+        <div class="metric-foot" id="stat-reading-count">0 articles saved to DB</div>
+      </div>
+      <div class="metric-card">
         <div class="metric-label">Active Auto-Publishers</div>
         <div class="metric-value" id="stat-publishers-count">8</div>
         <div class="metric-foot">Dev.to, LinkedIn, Bluesky, Mastodon</div>
@@ -68,11 +76,14 @@
       <button class="tab-btn" data-tab="tab-explorer">
         <span class="icon">🔍</span> Brain Explorer & Vector Search
       </button>
-      <button class="tab-btn" data-tab="tab-content">
-        <span class="icon">🚀</span> AI Content Engine
+      <button class="tab-btn" data-tab="tab-seo">
+        <span class="icon">📈</span> Personal SEO & Content Strategy
+      </button>
+      <button class="tab-btn" data-tab="tab-read">
+        <span class="icon">📚</span> What to Read & Time Tracker
       </button>
       <button class="tab-btn" data-tab="tab-platforms">
-        <span class="icon">🌐</span> Auto-Post Monitor
+        <span class="icon">🌐</span> Auto-Post & Skill Monitor
       </button>
     </nav>
 
@@ -180,88 +191,156 @@
         </div>
       </section>
 
-      <!-- TAB 3: AI CONTENT ENGINE -->
-      <section id="tab-content" class="tab-content">
+      <!-- TAB 3: PERSONAL SEO & CONTENT STRATEGY -->
+      <section id="tab-seo" class="tab-content">
         <div class="section-card">
           <div class="section-header">
-            <h2>🚀 AI Content Engine Generator</h2>
-            <p>Generates targeted post content packs for LinkedIn, Dev.to, X, and blogs based on your ingested second brain memory.</p>
+            <h2>📈 Personal SEO & Content Strategy Hub</h2>
+            <p>Grounded in Google Search API, your resume, skills, and trending developer search queries.</p>
           </div>
 
-          <div class="content-gen-banner">
+          <!-- SEO Score Overview Banner -->
+          <div id="seo-score-container" class="content-gen-banner" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(99, 102, 241, 0.12)); border: 1px solid rgba(16, 185, 129, 0.3);">
             <div>
-              <h3>Generate 2-Day Content Pack</h3>
-              <p>Analyzes your past posts, research notes, and trending developer topics to draft high-engagement content.</p>
+              <span style="font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:#10b981; font-weight:700;">🎯 Developer Personal Brand Audit</span>
+              <h3 id="seo-candidate-title" style="font-family:'Outfit',sans-serif; font-size:1.6rem; color:#fff; margin-top:0.25rem;">Analyzing Personal SEO Profile...</h3>
+              <p id="seo-rating-sub" style="font-size:0.9rem; color:var(--text-muted); margin-top:0.2rem;"></p>
             </div>
-            <button class="btn primary-btn" id="generate-pack-btn">
-              ⚡ Generate Content Pack Now
-            </button>
+            <div style="text-align:right;">
+              <div style="font-size:2.8rem; font-weight:800; font-family:'Outfit',sans-serif; color:#10b981;" id="seo-score-val">--</div>
+              <span style="font-size:0.75rem; color:var(--text-muted);">PERSONAL SEO INDEX</span>
+            </div>
           </div>
 
-          <div id="content-pack-output" style="margin-top: 2rem;">
-            <p class="placeholder-text">Click "Generate Content Pack Now" to build your social content pack.</p>
+          <!-- Dynamic Content: Headline Suggestions & Missing Keywords -->
+          <div id="seo-details-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem; margin-top:1.5rem;">
+            <p class="placeholder-text">Loading Personal SEO Insights...</p>
+          </div>
+
+          <!-- Google Search Live Grounding API Tool -->
+          <div style="margin-top: 2rem; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--card-border); padding: 1.5rem; border-radius: 14px;">
+            <h3 style="font-family:'Outfit',sans-serif; color:#fff; display:flex; align-items:center; gap:0.5rem;">
+              <span>🌐</span> Grounded Google Search API Tool
+            </h3>
+            <p style="font-size:0.88rem; color:var(--text-muted); margin-bottom:1rem;">Query Google Custom Search API to test personal indexing or discover real-time live tech news.</p>
+            <div class="search-box">
+              <input type="text" id="google-search-input" class="custom-input" placeholder="Query e.g. 'Node.js AI trends 2026', 'Abhishek Tiwari developer Jaipur'...">
+              <button class="btn primary-btn" id="google-search-btn">Run Google Search API</button>
+            </div>
+            <div id="google-search-results" style="margin-top:1.25rem; display:none;"></div>
+          </div>
+
+          <!-- What to Post Today & Trending Hashtags -->
+          <div style="margin-top: 2.5rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+              <h3 class="subsection-title" style="margin:0;">🔥 What You Should Post On Today (Personalized Topics & Trending Hashtags)</h3>
+              <button class="btn primary-btn" id="generate-pack-btn-seo" style="font-size:0.85rem; padding:0.4rem 0.85rem;">⚡ Draft Full Content Pack</button>
+            </div>
+            <div id="what-to-post-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem;">
+              <p class="placeholder-text">Loading recommended post topics...</p>
+            </div>
+          </div>
+
+          <!-- Content Pack Generator Output -->
+          <div id="content-pack-output" style="margin-top: 2rem;"></div>
+        </div>
+      </section>
+
+      <!-- TAB 4: WHAT TO READ & INTERACTIVE TIME TRACKER -->
+      <section id="tab-read" class="tab-content">
+        <div class="section-card">
+          <div class="section-header">
+            <h2>📚 What You Should Read Today & Time Tracker</h2>
+            <p>Curated technical reads matched to your profile with an <strong>Interactive Timer</strong> that logs actual reading duration to your database.</p>
+          </div>
+
+          <!-- Reading Recommendations Grid -->
+          <div style="margin-top:1rem;">
+            <h3 class="subsection-title">📖 Daily Recommended Technical Readings</h3>
+            <div id="what-to-read-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem;">
+              <p class="placeholder-text">Loading curated developer readings...</p>
+            </div>
+          </div>
+
+          <!-- Logged Reading History from Database -->
+          <div style="margin-top: 2.5rem;">
+            <h3 class="subsection-title">📊 Saved Reading History (Persisted in Supabase Database)</h3>
+            <div id="reading-history-container" style="background:rgba(0,0,0,0.2); border:1px solid var(--card-border); border-radius:12px; padding:1.25rem;">
+              <p class="placeholder-text">Loading logged reading records...</p>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- TAB 4: PLATFORM MONITOR -->
+      <!-- TAB 5: AUTO-POST & SKILL MONITOR -->
       <section id="tab-platforms" class="tab-content">
         <div class="section-card">
           <div class="section-header">
-            <h2>🌐 Universal Auto-Post Platform Monitor</h2>
-            <p>Real-time configuration and status for zero-friction platform auto-posting adapters.</p>
+            <h2>🌐 Universal Auto-Post & Smart Skill Growth Monitor</h2>
+            <p>Real-time platform publishing adapters & <strong>Autonomous Skill Learning Roadmap</strong> matched to your candidate profile.</p>
           </div>
 
-          <div class="platforms-grid" id="platforms-grid">
-            <div class="platform-card">
-              <div class="platform-head">
-                <span class="platform-name">Dev.to</span>
-                <span class="status-pill free">FREE / ZERO FRICTION</span>
+          <!-- SECTION 1: SKILL LEARNING & POSTING ROADMAP (STEP-BY-STEP SEQUENCE) -->
+          <div style="margin-top: 0.5rem; margin-bottom: 2.5rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+              <div>
+                <span style="font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:var(--accent-cyan); font-weight:700;">🧠 PRIORITIZED CAREER & SKILL LEARNING SEQUENCE</span>
+                <h3 style="font-family:'Outfit',sans-serif; color:#fff; margin-top:0.25rem; font-size:1.4rem;">What You Should Learn First, Build & Post</h3>
               </div>
-              <p>Direct API-key POST to `dev.to/api/articles`. No review required.</p>
-              <div class="platform-foot" id="plat-devto-status">Checking API Key...</div>
+              <span class="status-badge live" style="padding:0.4rem 0.8rem; font-size:0.8rem;">⚡ Auto-Generated for Candidate Profile</span>
             </div>
 
-            <div class="platform-card">
-              <div class="platform-head">
-                <span class="platform-name">LinkedIn Profile</span>
-                <span class="status-pill free">FREE / SELF-SERVE</span>
-              </div>
-              <p>Official Share API v2 (`w_member_social`). No partner review required for personal profile shares.</p>
-              <div class="platform-foot" id="plat-linkedin-status">Checking OAuth Token...</div>
+            <div id="skill-roadmap-container" style="display:flex; flex-direction:column; gap:1.5rem;">
+              <p class="placeholder-text">Loading skill learning sequence...</p>
             </div>
+          </div>
 
-            <div class="platform-card">
-              <div class="platform-head">
-                <span class="platform-name">Bluesky</span>
-                <span class="status-pill free">FREE / OPEN</span>
-              </div>
-              <p>AT Protocol app-password authentication.</p>
-              <div class="platform-foot" id="plat-bluesky-status">Checking credentials...</div>
-            </div>
-
-            <div class="platform-card">
-              <div class="platform-head">
-                <span class="platform-name">Mastodon</span>
-                <span class="status-pill free">FREE / OPEN</span>
-              </div>
-              <p>Native REST API access token.</p>
-              <div class="platform-foot" id="plat-mastodon-status">Checking credentials...</div>
-            </div>
-
-            <div class="platform-card">
-              <div class="platform-head">
-                <span class="platform-name">YouTube Data API v3</span>
-                <span class="status-pill optimized">1 UNIT QUOTA OPTIMIZED</span>
-              </div>
-              <p>`videos.list` Category 28 Science & Tech (~3 units/day across IN, US, GB).</p>
-              <div class="platform-foot" id="plat-youtube-status">Quota Optimized (~1 unit/call)</div>
+          <!-- SECTION 2: UNIVERSAL PLATFORM ADAPTERS -->
+          <div style="margin-top: 2rem; border-top: 1px solid var(--card-border); pt-1.5rem;">
+            <h3 class="subsection-title" style="margin-bottom:1rem;">🔌 Universal Auto-Post Platform Adapters Status</h3>
+            <div class="platforms-grid" id="platforms-grid">
+              <p class="placeholder-text">Loading platform adapters...</p>
             </div>
           </div>
         </div>
       </section>
 
     </main>
+  </div>
+
+  <!-- INTERACTIVE READING MODAL & TIMER -->
+  <div id="reading-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="font-size:1.4rem;">📖</span>
+          <h3 id="modal-read-title" style="margin:0; font-family:'Outfit',sans-serif; color:#fff;">Reading Article</h3>
+        </div>
+        <button class="modal-close-btn" id="close-modal-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="reading-timer-banner">
+          <div>
+            <span style="font-size:0.75rem; text-transform:uppercase; color:var(--accent-cyan); font-weight:700;">⏱️ REAL-TIME READING TRACKER</span>
+            <div id="live-timer-display" style="font-size:2.2rem; font-weight:800; font-family:monospace; color:#22c55e;">00:00</div>
+          </div>
+          <button class="btn secondary-btn" id="toggle-timer-btn" style="padding:0.4rem 0.8rem; font-size:0.85rem;">⏸️ Pause Timer</button>
+        </div>
+
+        <div style="margin-top:1.25rem; font-size:0.92rem; color:var(--text-light); line-height:1.6;" id="modal-read-snippet"></div>
+
+        <div style="margin-top:1rem; background:rgba(99,102,241,0.1); border-left:3px solid var(--accent-indigo); padding:0.75rem 1rem; border-radius:6px;">
+          <strong style="color:var(--accent-cyan); font-size:0.85rem;">💡 Key Principle to Remember:</strong>
+          <p id="modal-read-takeaway" style="margin-top:0.25rem; font-size:0.88rem; color:#fff;"></p>
+        </div>
+
+        <div style="margin-top:1rem; font-size:0.85rem;" id="modal-read-link"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn secondary-btn" id="cancel-read-btn">Discard Session</button>
+        <button class="btn primary-btn" id="complete-read-btn">✅ Complete & Save Reading to Database</button>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

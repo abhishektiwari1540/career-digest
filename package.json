@@ -13,6 +13,7 @@
     "daemon": "tsx src/index.ts --daemon",
     "server": "tsx src/server.ts",
     "ui": "tsx src/server.ts",
+    "daemon:247": "tsx src/daemon/run247Daemon.ts",
     "adk:test": "tsx src/testAdkAgent.ts",
     "voice:test": "tsx src/testVoiceProfile.ts",
     "import:linkedin": "tsx src/linkedinImport.ts"

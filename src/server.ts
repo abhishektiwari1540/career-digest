@@ -26,12 +26,23 @@ import { MetaGraphPublisher } from "./publishers/metaGraph.js";
 import {
   fetchRecentLinkedInPosts,
   fetchSecondBrainMemories,
+  getUserReadingStats,
+  recordUserReadingLog,
   saveMultimodalVector,
   saveSecondBrainMemory,
   supabase,
 } from "./storage/supabase.js";
 
 import { processLinkedInZipArchive } from "./storage/zipImporter.js";
+import { searchGoogleApi } from "./collectors/googleSearchEngine.js";
+import { generatePersonalSeoAnalysis } from "./llm/seoProfileEngine.js";
+import {
+  forceTriggerSelfUpdate,
+  getSelfUpdatingStatus,
+  setSelfUpdatingActive,
+  startSelfUpdatingEngine,
+} from "./engine/selfUpdatingEngine.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +51,32 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 150 * 1024 * 1024 } });
 
 app.use(express.json());
+
+// Security Middleware 1: Enforce NOINDEX on private Second Brain App
+app.use((req, res, next) => {
+  res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet");
+  next();
+});
+
+// Security Middleware 2: Guard API routes with secret header check option
+app.use("/api", (req, res, next) => {
+  const openPaths = ["/stats", "/memories", "/search", "/seo-profile", "/reading-stats", "/self-update/status", "/track-reading", "/google-search", "/upload"];
+  if (openPaths.includes(req.path)) {
+    return next();
+  }
+
+  const requiredSecret = process.env.CRON_SECRET || process.env.API_SECRET;
+  if (requiredSecret && requiredSecret.trim() !== "") {
+    const authHeader = req.headers.authorization;
+    const clientSecret = req.headers["x-second-brain-secret"] || (authHeader ? authHeader.replace("Bearer ", "") : req.query.secret);
+    if (clientSecret !== requiredSecret) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Invalid or missing API secret" });
+    }
+  }
+
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "../public")));
 
 /**
@@ -602,6 +639,99 @@ app.get("/api/linkedin/callback", async (req, res) => {
   }
 });
 
+// GET /api/seo-profile - Personal SEO & Profile Optimization Insights
+app.get("/api/seo-profile", async (req, res) => {
+  try {
+    const analysis = await generatePersonalSeoAnalysis();
+    res.json({ success: true, analysis });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/google-search - Grounded Google Search Query API
+app.post("/api/google-search", async (req, res) => {
+  try {
+    const { query } = req.body;
+    if (!query) return res.status(400).json({ success: false, error: "Query is required" });
+    const searchResult = await searchGoogleApi(query, 6);
+    res.json({ success: true, searchResult });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/track-reading - Record reading time & interaction in database
+app.post("/api/track-reading", async (req, res) => {
+  try {
+    const { articleTitle, url, topicCategory, readingTimeSeconds } = req.body;
+    if (!articleTitle) {
+      return res.status(400).json({ success: false, error: "articleTitle is required" });
+    }
+    const logEntry = await recordUserReadingLog({
+      articleTitle,
+      url,
+      topicCategory,
+      readingTimeSeconds: Number(readingTimeSeconds) || 60,
+    });
+    const stats = await getUserReadingStats();
+    res.json({ success: true, logEntry, stats });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/reading-stats - Retrieve user reading statistics
+app.get("/api/reading-stats", async (req, res) => {
+  try {
+    const stats = await getUserReadingStats();
+    res.json({ success: true, stats });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ALL /api/cron/daily - Vercel Scheduled Daily Cron Route Handler
+app.all("/api/cron/daily", async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && cronSecret.trim() !== "") {
+    const authHeader = req.headers.authorization;
+    const clientSecret = req.headers["x-second-brain-secret"] || (authHeader ? authHeader.replace("Bearer ", "") : req.query.secret);
+    if (clientSecret !== cronSecret) {
+      return res.status(401).json({ success: false, error: "Unauthorized Vercel Cron Secret" });
+    }
+  }
+
+  try {
+    const status = await forceTriggerSelfUpdate();
+    res.json({ success: true, message: "Vercel Daily Cron executed successfully", status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/self-update/status - Engine status & heartbeat
+app.get("/api/self-update/status", (req, res) => {
+  res.json({ success: true, status: getSelfUpdatingStatus() });
+});
+
+// POST /api/self-update/trigger - Force immediate self-update
+app.post("/api/self-update/trigger", async (req, res) => {
+  try {
+    const status = await forceTriggerSelfUpdate();
+    res.json({ success: true, status });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/self-update/toggle - Toggle auto sync active state
+app.post("/api/self-update/toggle", (req, res) => {
+  const { active } = req.body;
+  setSelfUpdatingActive(Boolean(active));
+  res.json({ success: true, status: getSelfUpdatingStatus() });
+});
+
 export default app;
 
 if (!process.env.VERCEL) {
@@ -611,6 +741,8 @@ if (!process.env.VERCEL) {
     console.log(`🚀 Second Brain Data Hub & Multi-Platform Web Dashboard is LIVE!`);
     console.log(`🔗 Open in Browser: http://localhost:${PORT}`);
     console.log(`======================================================\n`);
+    startSelfUpdatingEngine();
   });
 }
+
 

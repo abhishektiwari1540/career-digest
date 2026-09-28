@@ -328,3 +328,91 @@ export async function saveAudioBriefing(reportDate: string, audioUrl: string, du
   }
 }
 
+// In-Memory fallback for reading logs
+export interface UserReadingLog {
+  id?: string;
+  article_title: string;
+  url?: string;
+  topic_category: string;
+  reading_time_seconds: number;
+  read_at: string;
+}
+
+const inMemoryReadingLogs: UserReadingLog[] = [];
+
+export async function recordUserReadingLog(log: {
+  articleTitle: string;
+  url?: string;
+  topicCategory: string;
+  readingTimeSeconds: number;
+}): Promise<UserReadingLog> {
+  const entry: UserReadingLog = {
+    id: `read_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    article_title: log.articleTitle,
+    url: log.url || "",
+    topic_category: log.topicCategory || "Tech Reading",
+    reading_time_seconds: Math.max(1, Math.round(log.readingTimeSeconds)),
+    read_at: new Date().toISOString(),
+  };
+
+  inMemoryReadingLogs.unshift(entry);
+
+  try {
+    const { data, error } = await supabase.from("user_reading_logs").insert({
+      article_title: entry.article_title,
+      url: entry.url,
+      topic_category: entry.topic_category,
+      reading_time_seconds: entry.reading_time_seconds,
+      read_at: entry.read_at,
+    }).select().single();
+
+    if (!error && data) {
+      return data as UserReadingLog;
+    }
+  } catch (err: any) {
+    console.warn("[supabase] user_reading_logs table notice (used in-memory store):", err.message);
+  }
+
+  return entry;
+}
+
+export async function fetchUserReadingLogs(limit = 20): Promise<UserReadingLog[]> {
+  try {
+    const { data, error } = await supabase
+      .from("user_reading_logs")
+      .select("*")
+      .order("read_at", { ascending: false })
+      .limit(limit);
+
+    if (!error && data && data.length > 0) {
+      return data as UserReadingLog[];
+    }
+  } catch {
+    // fallback
+  }
+
+  return inMemoryReadingLogs.slice(0, limit);
+}
+
+export async function getUserReadingStats() {
+  const logs = await fetchUserReadingLogs(100);
+  const totalArticles = logs.length;
+  const totalSeconds = logs.reduce((acc, item) => acc + (item.reading_time_seconds || 0), 0);
+  const totalMinutes = (totalSeconds / 60).toFixed(1);
+
+  const topicCounts: Record<string, number> = {};
+  logs.forEach((l) => {
+    const cat = l.topic_category || "General";
+    topicCounts[cat] = (topicCounts[cat] || 0) + 1;
+  });
+
+  return {
+    totalArticles,
+    totalSeconds,
+    totalMinutes,
+    topicCounts,
+    recentLogs: logs.slice(0, 10),
+  };
+}
+
+
