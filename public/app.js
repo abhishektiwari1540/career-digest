@@ -32,6 +32,8 @@ document.addEventListener("DOMContentLoaded", () => {
         loadReadingSection();
       } else if (targetTab === "tab-platforms") {
         loadSkillRoadmapAndPlatforms();
+      } else if (targetTab === "tab-blogs") {
+        loadBlogsTab();
       }
     });
   });
@@ -1285,6 +1287,137 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
   }
+
+  // TAB 6: 12-BLOG COMPETITION & CHAMPION PORTFOLIO HUB
+  async function loadBlogsTab() {
+    const championContainer = document.getElementById("champion-blog-container");
+    const candidatesGrid = document.getElementById("candidates-blog-grid");
+    const championScoreBadge = document.getElementById("champion-score-badge");
+    const genBtn = document.getElementById("generate-12-blogs-btn");
+    const syncBtn = document.getElementById("sync-champion-portfolio-btn");
+    const genStatus = document.getElementById("blog-gen-status");
+
+    try {
+      // 1. Fetch Champion Blog
+      const championRes = await fetch("/api/blogs/champion");
+      const championData = await championRes.json();
+      if (championData.success && championData.champion) {
+        const champ = championData.champion;
+        if (championScoreBadge) {
+          championScoreBadge.textContent = `SEO Score: ${champ.seo_score || champ.seoScore || 94}/100`;
+        }
+        if (championContainer) {
+          championContainer.innerHTML = `
+            <div style="background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(15,23,42,0.8)); border: 1px solid rgba(16,185,129,0.4); border-radius: 14px; padding: 1.5rem;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+                <div style="flex:1;">
+                  <span style="font-size:0.75rem; font-weight:700; color:#10b981; text-transform:uppercase; letter-spacing:1px;">🥇 #1 RANKED DAILY CHAMPION BLOG</span>
+                  <h2 style="font-family:'Outfit',sans-serif; color:#fff; font-size:1.5rem; margin-top:0.3rem;">${escapeHtml(champ.title)}</h2>
+                  <p style="font-size:0.88rem; color:var(--text-muted); margin-top:0.3rem;">Target Keyword: <strong style="color:var(--accent-cyan);">${escapeHtml(champ.target_keyword || champ.targetKeyword)}</strong> • Slug: <code>${escapeHtml(champ.slug)}</code></p>
+                </div>
+                ${champ.cover_url || champ.coverUrl ? `<img src="${champ.cover_url || champ.coverUrl}" style="max-width:240px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);" alt="Cover Artwork">` : ''}
+              </div>
+
+              <div style="margin-top:1rem; background:rgba(0,0,0,0.3); padding:1rem; border-radius:8px; border-left:4px solid #10b981;">
+                <strong style="color:#10b981; font-size:0.85rem;">📝 TL;DR Summary / Direct Answer:</strong>
+                <p style="margin-top:0.25rem; font-size:0.9rem; color:#fff; line-height:1.5;">${escapeHtml(champ.tldr_summary || champ.tldrSummary || champ.meta_description)}</p>
+              </div>
+
+              <div style="margin-top:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                  ${(champ.hashtags || []).map(h => `<span class="chip-btn" style="padding:0.2rem 0.6rem; font-size:0.75rem; background:rgba(99,102,241,0.2); border-color:var(--accent-indigo);">${escapeHtml(h)}</span>`).join("")}
+                </div>
+                <button class="btn primary-btn" onclick="toggleChampionContent()" style="padding:0.4rem 0.85rem; font-size:0.82rem;">📖 Toggle Full Markdown Article</button>
+              </div>
+
+              <div id="champion-markdown-preview" style="display:none; margin-top:1.25rem; background:#090d16; border:1px solid var(--card-border); border-radius:8px; padding:1.25rem; color:#e2e8f0; font-size:0.9rem; line-height:1.7; max-height:450px; overflow-y:auto; white-space:pre-wrap;">${escapeHtml(champ.content_markdown || champ.contentMarkdown)}</div>
+            </div>
+          `;
+        }
+      }
+
+      // 2. Fetch All 12 Candidate Blogs
+      const candRes = await fetch("/api/blogs/candidates");
+      const candData = await candRes.json();
+      if (candData.success && candData.candidates && candData.candidates.length > 0) {
+        if (candidatesGrid) {
+          candidatesGrid.innerHTML = candData.candidates.map((c, idx) => `
+            <div class="metric-card" style="background: ${c.is_champion || c.isChampion ? 'rgba(16,185,129,0.08)' : 'rgba(15,23,42,0.6)'}; border-color: ${c.is_champion || c.isChampion ? '#10b981' : 'var(--card-border)'};">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                <span class="status-badge ${c.is_champion || c.isChampion ? 'active' : 'live'}" style="font-size:0.75rem;">
+                  ${c.is_champion || c.isChampion ? '🥇 #1 CHAMPION' : `RANK #${idx + 1}`}
+                </span>
+                <span style="font-weight:800; font-family:'Outfit',sans-serif; color:${c.seo_score >= 90 ? '#10b981' : '#38bdf8'}; font-size:1.1rem;">
+                  ${c.seo_score || c.seoScore}/100 Marks
+                </span>
+              </div>
+              <h4 style="color:#fff; font-family:'Outfit',sans-serif; font-size:1rem; margin-bottom:0.4rem;">${escapeHtml(c.title)}</h4>
+              <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.75rem;">Target: <strong style="color:var(--accent-cyan);">${escapeHtml(c.target_keyword || c.targetKeyword)}</strong></p>
+              <p style="font-size:0.85rem; color:var(--text-light); line-height:1.5; margin-bottom:1rem;">${escapeHtml((c.meta_description || c.metaDescription || "").slice(0, 110))}...</p>
+              <div style="font-size:0.75rem; color:var(--text-muted);">
+                ⚡ Evaluated across 11 SEO criteria (Code, Headings, Readability, Metadata)
+              </div>
+            </div>
+          `).join("");
+        }
+      } else if (candidatesGrid) {
+        candidatesGrid.innerHTML = `<p class="placeholder-text">Click "Generate 12 Candidate Blogs Now" to run the AI self-judging competition!</p>`;
+      }
+    } catch (err) {
+      console.warn("Blogs tab load warning:", err);
+    }
+
+    // Attach Event Listeners for Buttons
+    if (genBtn) {
+      genBtn.onclick = async () => {
+        genBtn.disabled = true;
+        if (genStatus) genStatus.style.display = "block";
+        genBtn.innerHTML = `<span>⏳</span> Generating 12 Blogs...`;
+        try {
+          const res = await fetch("/api/blogs/generate", { method: "POST" });
+          const data = await res.json();
+          if (data.success) {
+            alert(`🎉 Successfully generated 12 candidate blogs & selected Daily Champion: "${data.champion?.title}"!`);
+            loadBlogsTab();
+          } else {
+            alert(`Generation failed: ${data.error}`);
+          }
+        } catch (err) {
+          alert(`Error: ${err.message}`);
+        } finally {
+          genBtn.disabled = false;
+          if (genStatus) genStatus.style.display = "none";
+          genBtn.innerHTML = `<span>⚡</span> Generate 12 Candidate Blogs Now`;
+        }
+      };
+    }
+
+    if (syncBtn) {
+      syncBtn.onclick = async () => {
+        syncBtn.disabled = true;
+        syncBtn.innerHTML = `<span>🌐</span> Auto-Posting to Portfolio...`;
+        try {
+          const res = await fetch("/api/blogs/sync", { method: "POST" });
+          const data = await res.json();
+          if (data.success) {
+            alert(`🚀 Champion Blog synchronized and ready for publication at https://www.abhishektiwari.online/!\n\nStatus: ${data.webhookStatus}`);
+          } else {
+            alert(`Sync failed: ${data.error}`);
+          }
+        } catch (err) {
+          alert(`Error: ${err.message}`);
+        } finally {
+          syncBtn.disabled = false;
+          syncBtn.innerHTML = `<span>🌐</span> Auto-Post Champion to Portfolio`;
+        }
+      };
+    }
+  }
+
+  window.toggleChampionContent = function() {
+    const el = document.getElementById("champion-markdown-preview");
+    if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+  };
 
   function escapeHtml(str) {
     if (!str) return "";

@@ -88,6 +88,9 @@
       <button class="tab-btn" data-tab="tab-platforms">
         <span class="icon">🌐</span> Auto-Post & Skill Monitor
       </button>
+      <button class="tab-btn" data-tab="tab-blogs">
+        <span class="icon">🏆</span> Daily 12-Blog Competition & Portfolio Sync
+      </button>
     </nav>
 
     <!-- Main Content Area -->
@@ -333,6 +336,57 @@
             <h3 class="subsection-title" style="margin-bottom:1rem;">🔌 Universal Auto-Post Platform Adapters Status</h3>
             <div class="platforms-grid" id="platforms-grid">
               <p class="placeholder-text">Loading platform adapters...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: DAILY 12-BLOG COMPETITION & PORTFOLIO SYNC -->
+      <section id="tab-blogs" class="tab-content">
+        <div class="section-card">
+          <div class="section-header">
+            <h2>🏆 Daily 12-Blog AI Competition & Portfolio Sync Hub</h2>
+            <p>Generates 12 candidate technical blogs daily, self-judges SEO scores out of 100 marks, ranks #1 to #12, selects the Champion Blog, and auto-posts to <code>https://www.abhishektiwari.online/</code>.</p>
+          </div>
+
+          <!-- Action Control Bar -->
+          <div style="background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(16,185,129,0.15)); border: 1px solid rgba(99,102,241,0.3); padding: 1.5rem; border-radius: 14px; margin-top: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <span style="font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:#38bdf8; font-weight:700;">⚡ DUAL MODE CONTROL: AUTOMATIC & MANUAL TRIGGER</span>
+              <h3 style="font-family:'Outfit',sans-serif; color:#fff; margin-top:0.25rem;">Generate 12 Blogs & Sync Champion anytime (1x, 2x or 3x Daily)</h3>
+              <p style="font-size:0.88rem; color:var(--text-muted); margin-top:0.2rem;">Runs 1x daily automatically via Vercel Cron. Click below anytime to manually trigger a fresh batch of 12 candidate blogs!</p>
+            </div>
+            <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+              <button class="btn primary-btn" id="generate-12-blogs-btn" style="background:linear-gradient(135deg, #6366f1, #4f46e5); padding:0.6rem 1.25rem; font-weight:700; display:flex; align-items:center; gap:0.5rem; box-shadow:0 4px 15px rgba(99,102,241,0.4);">
+                <span>⚡</span> Generate 12 Candidate Blogs Now
+              </button>
+              <button class="btn primary-btn" id="sync-champion-portfolio-btn" style="background:linear-gradient(135deg, #10b981, #059669); padding:0.6rem 1.25rem; font-weight:700; display:flex; align-items:center; gap:0.5rem; box-shadow:0 4px 15px rgba(16,185,129,0.4);">
+                <span>🌐</span> Auto-Post Champion to Portfolio
+              </button>
+            </div>
+          </div>
+
+          <!-- Loading & Status Indicator -->
+          <div id="blog-gen-status" style="display:none; margin-top:1.25rem; background:rgba(99,102,241,0.1); border:1px solid var(--accent-indigo); padding:1rem; border-radius:10px; color:#38bdf8; font-weight:600;">
+            ⏳ Generating 12 candidate technical blogs with AI, creating cover artwork, and running 11-point SEO evaluation... Please wait (~10-15s).
+          </div>
+
+          <!-- Section 1: Today's #1 Ranked Daily Champion Blog -->
+          <div style="margin-top: 2rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+              <h3 class="subsection-title" style="margin:0;">🥇 Today's #1 Ranked Daily Champion Blog</h3>
+              <span class="status-badge active" id="champion-score-badge" style="background:#10b981; color:#fff; font-weight:800; padding:0.35rem 0.8rem; font-size:0.85rem;">SEO Score: --/100</span>
+            </div>
+            <div id="champion-blog-container">
+              <p class="placeholder-text">Loading latest Champion Blog...</p>
+            </div>
+          </div>
+
+          <!-- Section 2: All 12 Evaluated Candidate Blogs Grid -->
+          <div style="margin-top: 2.5rem;">
+            <h3 class="subsection-title" style="margin-bottom:1rem;">📊 All 12 Evaluated Candidate Blogs & SEO Benchmark Scores</h3>
+            <div id="candidates-blog-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem;">
+              <p class="placeholder-text">Loading 12 blog candidates...</p>
             </div>
           </div>
         </div>
