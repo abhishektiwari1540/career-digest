@@ -34,7 +34,10 @@
           <span class="dot"></span> ⚡ Self-Updating: <span id="engine-timer-display">Active (60s)</span>
         </div>
         <button class="btn secondary-btn" id="force-sync-btn" title="Force Immediate Self-Update Cycle" style="padding:0.35rem 0.75rem; font-size:0.75rem; display:flex; align-items:center; gap:0.3rem;">
-          <span>🔄</span> Sync Now
+          <span>🔄</span> Engine Sync
+        </button>
+        <button class="btn primary-btn" id="sync-website-seo-btn" title="Sync SEO Metadata to https://www.abhishektiwari.online/" style="padding:0.35rem 0.85rem; font-size:0.75rem; display:flex; align-items:center; gap:0.4rem; background:linear-gradient(135deg, #10b981, #059669); border:none; box-shadow:0 4px 14px rgba(16,185,129,0.3);">
+          <span>🌐</span> Sync SEO to Website
         </button>
       </div>
     </header>
@@ -209,6 +212,36 @@
             <div style="text-align:right;">
               <div style="font-size:2.8rem; font-weight:800; font-family:'Outfit',sans-serif; color:#10b981;" id="seo-score-val">--</div>
               <span style="font-size:0.75rem; color:var(--text-muted);">PERSONAL SEO INDEX</span>
+            </div>
+          </div>
+
+          <!-- WEBSITE SEO SYNC CONTROL PANEL (For https://www.abhishektiwari.online/) -->
+          <div style="margin-top: 1.5rem; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); padding: 1.5rem; border-radius: 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+              <div>
+                <span style="font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:#10b981; font-weight:700;">🌐 LIVE WEBSITE SEO SYNCHRONIZATION HUB</span>
+                <h3 style="font-family:'Outfit',sans-serif; color:#fff; margin-top:0.25rem;">Sync & Auto-Apply SEO to <code>https://www.abhishektiwari.online/</code></h3>
+                <p style="font-size:0.88rem; color:var(--text-muted); margin-top:0.25rem;">Generates, saves to database table <code>seo_metadata</code>, and applies optimized Meta Tags, OpenGraph & JSON-LD to <strong>Home (<code>/</code>)</strong>, <strong>About (<code>/about</code>)</strong>, and <strong>Contact (<code>/#contact</code>)</strong> pages.</p>
+              </div>
+              <button class="btn primary-btn" id="seo-sync-main-btn" style="background:linear-gradient(135deg, #10b981, #059669); border:none; padding:0.6rem 1.2rem; font-weight:700; display:flex; align-items:center; gap:0.5rem; box-shadow:0 4px 15px rgba(16,185,129,0.4);">
+                <span>⚡</span> Trigger Website SEO Sync Now
+              </button>
+            </div>
+
+            <!-- Sync Output & Receiver Code Preview Container -->
+            <div id="seo-sync-status-container" style="display:none; margin-top:1.25rem; background:rgba(0,0,0,0.3); border:1px solid var(--card-border); border-radius:10px; padding:1.25rem;">
+              <div id="seo-sync-status-header" style="font-weight:700; color:#10b981; font-size:1rem; margin-bottom:0.75rem;"></div>
+              <div id="seo-sync-pages-breakdown" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem; margin-bottom:1.25rem;"></div>
+              
+              <!-- Integration Instructions & Code Snippet -->
+              <div style="background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                  <strong style="color:var(--accent-cyan); font-size:0.88rem;">📦 Copy-Paste Receiver Code Snippet for <code>https://www.abhishektiwari.online/</code></strong>
+                  <button class="btn secondary-btn" id="copy-receiver-code-btn" style="padding:0.25rem 0.6rem; font-size:0.75rem;">📋 Copy Code</button>
+                </div>
+                <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;">Paste this 1-line script tag inside the <code>&lt;head&gt;</code> of your website index.html, about.html, or contact.html. It automatically fetches live synced SEO metadata and updates all meta tags!</p>
+                <pre style="background:#090d16; color:#38bdf8; padding:0.75rem; border-radius:6px; font-size:0.82rem; overflow-x:auto; white-space:pre-wrap;" id="receiver-code-text"><code>&lt;script src="https://career-digest.vercel.app/seo-sync.js"&gt;&lt;/script&gt;</code></pre>
+              </div>
             </div>
           </div>
 

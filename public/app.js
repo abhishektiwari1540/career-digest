@@ -1160,6 +1160,130 @@ document.addEventListener("DOMContentLoaded", () => {
       console.warn("Stats fetch warning:", err);
     }
     loadReadingHistory();
+    initSeoSyncHandlers();
+  }
+
+  // Website SEO Synchronization UI Handlers (For https://www.abhishektiwari.online/)
+  function initSeoSyncHandlers() {
+    const syncHeaderBtn = document.getElementById("sync-website-seo-btn");
+    const syncMainBtn = document.getElementById("seo-sync-main-btn");
+    const statusContainer = document.getElementById("seo-sync-status-container");
+    const statusHeader = document.getElementById("seo-sync-status-header");
+    const pagesBreakdown = document.getElementById("seo-sync-pages-breakdown");
+    const copyCodeBtn = document.getElementById("copy-receiver-code-btn");
+
+    async function triggerWebsiteSeoSync(btnEl) {
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.innerHTML = `<span>⏳</span> Syncing Website SEO...`;
+      }
+
+      if (statusContainer) {
+        statusContainer.style.display = "block";
+        statusHeader.innerHTML = `⏳ Triggering SEO Sync for target site: <strong>https://www.abhishektiwari.online/</strong>...`;
+        pagesBreakdown.innerHTML = `<p class="placeholder-text">Generating Meta Tags, OpenGraph & JSON-LD schemas for Home (/), About (/about), and Contact (/#contact)...</p>`;
+      }
+
+      try {
+        const res = await fetch("/api/seo/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetSite: "https://www.abhishektiwari.online/" }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          if (statusHeader) {
+            statusHeader.innerHTML = `🎉 SEO Metadata Synchronized & Persisted in Supabase (table: <code>seo_metadata</code>)!`;
+          }
+
+          if (pagesBreakdown && data.pages) {
+            let html = "";
+            Object.keys(data.pages).forEach((route) => {
+              const item = data.pages[route];
+              html += `
+                <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(16,185,129,0.3); border-radius:8px; padding:0.9rem;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+                    <span style="font-weight:700; color:#10b981; font-size:0.88rem;">📄 Page: ${escapeHtml(route)}</span>
+                    <span class="status-pill free" style="font-size:0.7rem;">READY FOR RECEIVER</span>
+                  </div>
+                  <div style="font-size:0.83rem; color:#fff; font-weight:600; margin-bottom:0.3rem;">
+                    Title: ${escapeHtml(item.meta_title)}
+                  </div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.4rem; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                    <strong>Description:</strong> ${escapeHtml(item.meta_description)}
+                  </div>
+                  <div style="font-size:0.72rem; color:var(--accent-cyan);">
+                    <strong>Keywords:</strong> ${escapeHtml(item.meta_keywords ? item.meta_keywords.slice(0, 100) + '...' : '')}
+                  </div>
+                </div>
+              `;
+            });
+            pagesBreakdown.innerHTML = html;
+          }
+
+          if (syncHeaderBtn) {
+            syncHeaderBtn.innerHTML = `<span>✅</span> SEO Synced!`;
+            setTimeout(() => {
+              syncHeaderBtn.disabled = false;
+              syncHeaderBtn.innerHTML = `<span>🌐</span> Sync SEO to Website`;
+            }, 3000);
+          }
+
+          if (syncMainBtn) {
+            syncMainBtn.innerHTML = `<span>✅</span> Sync Complete!`;
+            setTimeout(() => {
+              syncMainBtn.disabled = false;
+              syncMainBtn.innerHTML = `<span>⚡</span> Trigger Website SEO Sync Now`;
+            }, 3000);
+          }
+        } else {
+          const errText = data.error || "Failed to sync SEO metadata";
+          if (statusHeader) statusHeader.innerHTML = `❌ SEO Sync Error: ${escapeHtml(errText)}`;
+          if (syncHeaderBtn) {
+            syncHeaderBtn.disabled = false;
+            syncHeaderBtn.innerHTML = `<span>🌐</span> Sync SEO to Website`;
+          }
+          if (syncMainBtn) {
+            syncMainBtn.disabled = false;
+            syncMainBtn.innerHTML = `<span>⚡</span> Trigger Website SEO Sync Now`;
+          }
+        }
+      } catch (err) {
+        if (statusHeader) statusHeader.innerHTML = `❌ Network Error: ${escapeHtml(err.message)}`;
+        if (syncHeaderBtn) {
+          syncHeaderBtn.disabled = false;
+          syncHeaderBtn.innerHTML = `<span>🌐</span> Sync SEO to Website`;
+        }
+        if (syncMainBtn) {
+          syncMainBtn.disabled = false;
+          syncMainBtn.innerHTML = `<span>⚡</span> Trigger Website SEO Sync Now`;
+        }
+      }
+    }
+
+    if (syncHeaderBtn) {
+      syncHeaderBtn.addEventListener("click", () => {
+        const seoTabBtn = document.querySelector('.tab-btn[data-tab="tab-seo"]');
+        if (seoTabBtn) seoTabBtn.click();
+        triggerWebsiteSeoSync(syncHeaderBtn);
+      });
+    }
+
+    if (syncMainBtn) {
+      syncMainBtn.addEventListener("click", () => triggerWebsiteSeoSync(syncMainBtn));
+    }
+
+    if (copyCodeBtn) {
+      copyCodeBtn.addEventListener("click", () => {
+        const codeText = document.getElementById("receiver-code-text")?.textContent || `<script src="https://career-digest.vercel.app/seo-sync.js"></script>`;
+        navigator.clipboard.writeText(codeText).then(() => {
+          copyCodeBtn.textContent = "✅ Copied!";
+          setTimeout(() => { copyCodeBtn.textContent = "📋 Copy Code"; }, 2000);
+        });
+      });
+    }
   }
 
   function escapeHtml(str) {

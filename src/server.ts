@@ -26,10 +26,12 @@ import { MetaGraphPublisher } from "./publishers/metaGraph.js";
 import {
   fetchRecentLinkedInPosts,
   fetchSecondBrainMemories,
+  fetchSeoMetadataRecords,
   getUserReadingStats,
   recordUserReadingLog,
   saveMultimodalVector,
   saveSecondBrainMemory,
+  saveSeoMetadataRecords,
   supabase,
 } from "./storage/supabase.js";
 
@@ -52,6 +54,17 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 150
 
 app.use(express.json());
 
+// Enable CORS for SEO Sync API endpoints (allows https://www.abhishektiwari.online to fetch SEO data directly)
+app.use("/api/seo/sync", (req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-second-brain-secret");
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+});
+
 // Security Middleware 1: Enforce NOINDEX on private Second Brain App
 app.use((req, res, next) => {
   res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet");
@@ -60,7 +73,7 @@ app.use((req, res, next) => {
 
 // Security Middleware 2: Guard API routes with secret header check option
 app.use("/api", (req, res, next) => {
-  const openPaths = ["/stats", "/memories", "/search", "/seo-profile", "/reading-stats", "/self-update/status", "/track-reading", "/google-search", "/upload"];
+  const openPaths = ["/stats", "/memories", "/search", "/seo-profile", "/seo/sync", "/reading-stats", "/self-update/status", "/track-reading", "/google-search", "/upload"];
   if (openPaths.includes(req.path)) {
     return next();
   }
@@ -644,6 +657,188 @@ app.get("/api/seo-profile", async (req, res) => {
   try {
     const analysis = await generatePersonalSeoAnalysis();
     res.json({ success: true, analysis });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/seo/sync - Generate & Synchronize SEO Metadata for https://www.abhishektiwari.online/
+app.post("/api/seo/sync", async (req, res) => {
+  try {
+    const analysis = await generatePersonalSeoAnalysis();
+    const candidateName = analysis.candidateName || "Abhishek Tiwari";
+    const keywordsList = [...analysis.topCoveredKeywords, ...analysis.recommendedSeoKeywords].join(", ");
+
+    const webhookUrl = req.body?.webhookUrl || process.env.RECEIVER_WEBHOOK_URL;
+
+    // Build SEO metadata records for target site https://www.abhishektiwari.online/
+    const pagesSeoData = [
+      {
+        page_route: "/",
+        meta_title: `${candidateName} | Senior Backend Developer (Node.js, Express, TypeScript) & AI Engineer`,
+        meta_description: `Official Portfolio of ${candidateName} - Senior Backend Developer & AI LLM Integration Specialist with 3+ years experience building high-concurrency Node.js microservices, Gemini vector search engines, and PHP/Laravel applications.`,
+        meta_keywords: keywordsList,
+        og_title: `${candidateName} | Senior Backend Developer & AI LLM Specialist`,
+        og_description: `Building high-throughput Node.js microservices, real-time WebSockets, and Gemini multimodal vector search systems.`,
+        og_image: "https://www.abhishektiwari.online/og-image.jpg",
+        canonical_url: "https://www.abhishektiwari.online/",
+        structured_jsonld: {
+          "@context": "https://schema.org",
+          "@type": "Person",
+          "name": candidateName,
+          "url": "https://www.abhishektiwari.online/",
+          "jobTitle": "Senior Backend Developer & AI LLM Engineer",
+          "sameAs": [
+            "https://career-digest.vercel.app/",
+            "https://github.com/abhishektiwari1540",
+            "https://linkedin.com/in/abhishektiwari"
+          ],
+          "knowsAbout": analysis.topCoveredKeywords,
+          "description": `Senior Backend Engineer specializing in Node.js, Express.js, TypeScript, PHP/Laravel, and AI integrations.`
+        }
+      },
+      {
+        page_route: "/about",
+        meta_title: `About ${candidateName} | Senior Backend Architect & AI Systems Specialist`,
+        meta_description: `Learn more about ${candidateName}'s technical journey, 3+ years production expertise in Node.js, TypeScript, Express, Supabase pgvector, and cloud microservices.`,
+        meta_keywords: `About ${candidateName}, Backend Engineer Bio, Node.js Expert, Gemini AI RAG Engineer, Supabase pgvector Specialist`,
+        og_title: `About ${candidateName} - Senior Backend & AI Architect`,
+        og_description: `3+ years engineering scalable backend systems, async retry queues, and multimodal vector search engines.`,
+        og_image: "https://www.abhishektiwari.online/og-about-image.jpg",
+        canonical_url: "https://www.abhishektiwari.online/about",
+        structured_jsonld: {
+          "@context": "https://schema.org",
+          "@type": "ProfilePage",
+          "mainEntity": {
+            "@type": "Person",
+            "name": candidateName,
+            "jobTitle": "Senior Backend Architect",
+            "description": analysis.profileStrengths.join(" ")
+          }
+        }
+      },
+      {
+        page_route: "/#contact",
+        meta_title: `Contact ${candidateName} | Hire Senior Backend Developer & AI LLM Consultant`,
+        meta_description: `Get in touch with ${candidateName} for senior backend developer roles, AI system architecture, microservices engineering, and technical consulting. Available for high-impact remote engagements.`,
+        meta_keywords: `Contact ${candidateName}, Hire Senior Backend Developer, Node.js Consultant, AI Developer Hire, Tech Consultant`,
+        og_title: `Contact ${candidateName} - Hire Senior Backend & AI LLM Developer`,
+        og_description: `Available for senior backend engineering roles, AI microservice architecture, and technical consulting.`,
+        og_image: "https://www.abhishektiwari.online/og-contact-image.jpg",
+        canonical_url: "https://www.abhishektiwari.online/#contact",
+        structured_jsonld: {
+          "@context": "https://schema.org",
+          "@type": "ContactPage",
+          "name": `Contact ${candidateName}`,
+          "url": "https://www.abhishektiwari.online/#contact",
+          "mainEntity": {
+            "@type": "Person",
+            "name": candidateName,
+            "email": "contact@abhishektiwari.online"
+          }
+        }
+      }
+    ];
+
+    // 1. Save records to database
+    await saveSeoMetadataRecords(pagesSeoData);
+
+    // 2. Fire receiver webhook if configured
+    let webhookStatus = "No webhook URL specified (saved locally & database)";
+    if (webhookUrl) {
+      try {
+        const hookRes = await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event: "SEO_METADATA_SYNC",
+            targetSite: "https://www.abhishektiwari.online/",
+            updatedAt: new Date().toISOString(),
+            pages: pagesSeoData
+          })
+        });
+        webhookStatus = hookRes.ok ? `Webhook delivered successfully (${hookRes.status})` : `Webhook failed (${hookRes.status})`;
+      } catch (err: any) {
+        webhookStatus = `Webhook error: ${err.message}`;
+      }
+    }
+
+    const seoMap: Record<string, any> = {};
+    pagesSeoData.forEach((p) => { seoMap[p.page_route] = p; });
+
+    res.json({
+      success: true,
+      message: "SEO metadata generated, synchronized, and saved successfully!",
+      timestamp: new Date().toISOString(),
+      targetSite: "https://www.abhishektiwari.online/",
+      pagesUpdatedCount: pagesSeoData.length,
+      pages: seoMap,
+      webhookStatus,
+      receiverScriptUrl: "https://career-digest.vercel.app/api/seo/sync"
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/seo/sync - Retrieve synchronized SEO metadata (Used by client receiver script on https://www.abhishektiwari.online/)
+app.get("/api/seo/sync", async (req, res) => {
+  try {
+    const records = await fetchSeoMetadataRecords();
+    
+    // If store is empty, trigger initial generation
+    if (Object.keys(records).length === 0) {
+      const analysis = await generatePersonalSeoAnalysis();
+      const candidateName = analysis.candidateName || "Abhishek Tiwari";
+      const keywordsList = [...analysis.topCoveredKeywords, ...analysis.recommendedSeoKeywords].join(", ");
+
+      const pagesSeoData = [
+        {
+          page_route: "/",
+          meta_title: `${candidateName} | Senior Backend Developer (Node.js, Express, TypeScript) & AI Engineer`,
+          meta_description: `Official Portfolio of ${candidateName} - Senior Backend Developer & AI LLM Integration Specialist with 3+ years experience building high-concurrency Node.js microservices, Gemini vector search engines, and PHP/Laravel applications.`,
+          meta_keywords: keywordsList,
+          og_title: `${candidateName} | Senior Backend Developer & AI LLM Specialist`,
+          og_description: `Building high-throughput Node.js microservices, real-time WebSockets, and Gemini multimodal vector search systems.`,
+          og_image: "https://www.abhishektiwari.online/og-image.jpg",
+          canonical_url: "https://www.abhishektiwari.online/",
+          structured_jsonld: {
+            "@context": "https://schema.org",
+            "@type": "Person",
+            "name": candidateName,
+            "url": "https://www.abhishektiwari.online/",
+            "jobTitle": "Senior Backend Developer & AI LLM Engineer",
+            "sameAs": ["https://career-digest.vercel.app/"]
+          }
+        },
+        {
+          page_route: "/about",
+          meta_title: `About ${candidateName} | Senior Backend Architect & AI Systems Specialist`,
+          meta_description: `Learn more about ${candidateName}'s technical journey, 3+ years production expertise in Node.js, TypeScript, Express, Supabase pgvector, and cloud microservices.`,
+          meta_keywords: `About ${candidateName}, Backend Engineer Bio, Node.js Expert, Gemini AI RAG Engineer, Supabase pgvector Specialist`,
+          og_title: `About ${candidateName} - Senior Backend & AI Architect`,
+          og_description: `3+ years engineering scalable backend systems, async retry queues, and multimodal vector search engines.`,
+          og_image: "https://www.abhishektiwari.online/og-about-image.jpg",
+          canonical_url: "https://www.abhishektiwari.online/about"
+        },
+        {
+          page_route: "/#contact",
+          meta_title: `Contact ${candidateName} | Hire Senior Backend Developer & AI LLM Consultant`,
+          meta_description: `Get in touch with ${candidateName} for senior backend developer roles, AI system architecture, microservices engineering, and technical consulting. Available for high-impact remote engagements.`,
+          meta_keywords: `Contact ${candidateName}, Hire Senior Backend Developer, Node.js Consultant, AI Developer Hire, Tech Consultant`,
+          og_title: `Contact ${candidateName} - Hire Senior Backend & AI LLM Developer`,
+          og_description: `Available for senior backend engineering roles, AI microservice architecture, and technical consulting.`,
+          og_image: "https://www.abhishektiwari.online/og-contact-image.jpg",
+          canonical_url: "https://www.abhishektiwari.online/#contact"
+        }
+      ];
+
+      await saveSeoMetadataRecords(pagesSeoData);
+      const updatedRecords = await fetchSeoMetadataRecords();
+      return res.json({ success: true, pages: updatedRecords });
+    }
+
+    res.json({ success: true, pages: records });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

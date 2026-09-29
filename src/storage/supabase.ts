@@ -415,4 +415,75 @@ export async function getUserReadingStats() {
   };
 }
 
+export interface SeoPageMetadataRecord {
+  id?: string;
+  page_route: string;
+  meta_title: string;
+  meta_description: string;
+  meta_keywords: string;
+  og_title?: string;
+  og_description?: string;
+  og_image?: string;
+  canonical_url?: string;
+  structured_jsonld?: any;
+  updated_at?: string;
+}
+
+const inMemorySeoStore: Record<string, SeoPageMetadataRecord> = {};
+
+export async function saveSeoMetadataRecords(records: SeoPageMetadataRecord[]): Promise<boolean> {
+  const updatedTime = new Date().toISOString();
+  
+  // Always update in-memory cache as fallback
+  records.forEach((r) => {
+    r.updated_at = updatedTime;
+    inMemorySeoStore[r.page_route] = r;
+  });
+
+  try {
+    const rows = records.map((r) => ({
+      page_route: r.page_route,
+      meta_title: r.meta_title,
+      meta_description: r.meta_description,
+      meta_keywords: r.meta_keywords,
+      og_title: r.og_title || r.meta_title,
+      og_description: r.og_description || r.meta_description,
+      og_image: r.og_image || "https://www.abhishektiwari.online/og-image.jpg",
+      canonical_url: r.canonical_url || `https://www.abhishektiwari.online${r.page_route}`,
+      structured_jsonld: r.structured_jsonld || {},
+      updated_at: updatedTime,
+    }));
+
+    const { error } = await supabase.from("seo_metadata").upsert(rows, {
+      onConflict: "page_route",
+    });
+
+    if (error) {
+      console.warn("[supabase] seo_metadata upsert notice (used in-memory store):", error.message);
+    }
+    return true;
+  } catch (err: any) {
+    console.warn("[supabase] saveSeoMetadataRecords exception:", err.message);
+    return false;
+  }
+}
+
+export async function fetchSeoMetadataRecords(): Promise<Record<string, SeoPageMetadataRecord>> {
+  try {
+    const { data, error } = await supabase.from("seo_metadata").select("*");
+    if (!error && data && data.length > 0) {
+      const out: Record<string, SeoPageMetadataRecord> = {};
+      data.forEach((row: any) => {
+        out[row.page_route] = row;
+      });
+      return out;
+    }
+  } catch {
+    // fallback
+  }
+
+  return inMemorySeoStore;
+}
+
+
 

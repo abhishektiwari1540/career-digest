@@ -182,6 +182,21 @@ create table if not exists seo_metrics (
   checked_at timestamptz not null default now()
 );
 
+-- 16. SEO Website Metadata Sync Table (For https://www.abhishektiwari.online/)
+create table if not exists seo_metadata (
+  id uuid primary key default gen_random_uuid(),
+  page_route text not null unique, -- '/', '/about', '/#contact'
+  meta_title text not null,
+  meta_description text not null,
+  meta_keywords text not null,
+  og_title text,
+  og_description text,
+  og_image text,
+  canonical_url text,
+  structured_jsonld jsonb default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 -- ====================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES — ENFORCE DATA PRIVACY
 -- ====================================================================
@@ -201,12 +216,16 @@ ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE syndication_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_stats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE seo_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE seo_metadata ENABLE ROW LEVEL SECURITY;
 
--- 1. Public Read Policy for Published Blog Posts & Projects (Portfolio Frontend)
+-- 1. Public Read Policy for Published Blog Posts, Projects & SEO Metadata
 CREATE POLICY "Public can read published posts" ON posts
   FOR SELECT USING (status = 'published');
 
 CREATE POLICY "Public can read projects" ON projects
+  FOR SELECT USING (true);
+
+CREATE POLICY "Public can read seo_metadata" ON seo_metadata
   FOR SELECT USING (true);
 
 -- 2. Service Role Full Access Policies (Backend Engine Only)
@@ -225,3 +244,4 @@ CREATE POLICY "Service role full access on posts" ON posts FOR ALL USING (auth.r
 CREATE POLICY "Service role full access on syndication_log" ON syndication_log FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service role full access on job_stats" ON job_stats FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service role full access on seo_metrics" ON seo_metrics FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service role full access on seo_metadata" ON seo_metadata FOR ALL USING (auth.role() = 'service_role');
