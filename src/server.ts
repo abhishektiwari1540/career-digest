@@ -99,7 +99,7 @@ app.use("/api", (req, res, next) => {
     "/blogs/generate",
     "/blogs/sync"
   ];
-  if (openPaths.includes(req.path)) {
+  if (openPaths.some((p) => req.path === p || req.path.startsWith(p))) {
     return next();
   }
 
