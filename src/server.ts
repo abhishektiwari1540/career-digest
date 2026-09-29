@@ -675,36 +675,35 @@ app.post("/api/seo/sync", async (req, res) => {
     const pagesSeoData = [
       {
         page_route: "/",
-        meta_title: `${candidateName} | Senior Backend Developer (Node.js, Express, TypeScript) & AI Engineer`,
-        meta_description: `Official Portfolio of ${candidateName} - Senior Backend Developer & AI LLM Integration Specialist with 3+ years experience building high-concurrency Node.js microservices, Gemini vector search engines, and PHP/Laravel applications.`,
+        meta_title: `Abhishek Tiwari | Full Stack Developer – React, Node, AI`,
+        meta_description: `Full stack developer building booking platforms, fintech dashboards and identity systems with React, Node.js, Laravel and AI. See projects and get in touch.`,
         meta_keywords: keywordsList,
-        og_title: `${candidateName} | Senior Backend Developer & AI LLM Specialist`,
-        og_description: `Building high-throughput Node.js microservices, real-time WebSockets, and Gemini multimodal vector search systems.`,
-        og_image: "https://www.abhishektiwari.online/og-image.jpg",
+        og_title: `Abhishek Tiwari | Full Stack Developer`,
+        og_description: `Booking platforms, fintech dashboards and identity systems with React, Node, Laravel and AI.`,
+        og_image: "https://www.abhishektiwari.online/og.png",
         canonical_url: "https://www.abhishektiwari.online/",
         structured_jsonld: {
           "@context": "https://schema.org",
           "@type": "Person",
           "name": candidateName,
           "url": "https://www.abhishektiwari.online/",
-          "jobTitle": "Senior Backend Developer & AI LLM Engineer",
+          "jobTitle": "Full Stack Developer",
           "sameAs": [
-            "https://career-digest.vercel.app/",
-            "https://github.com/abhishektiwari1540",
-            "https://linkedin.com/in/abhishektiwari"
+            "https://linkedin.com/in/abhishektiwari1540",
+            "https://github.com/abhishektiwari1540"
           ],
-          "knowsAbout": analysis.topCoveredKeywords,
-          "description": `Senior Backend Engineer specializing in Node.js, Express.js, TypeScript, PHP/Laravel, and AI integrations.`
+          "knowsAbout": ["React", "Node.js", "Laravel", "TypeScript", "AI integration"],
+          "description": `Full stack developer building booking platforms, fintech dashboards and identity systems with React, Node.js, Laravel and AI.`
         }
       },
       {
         page_route: "/about",
-        meta_title: `About ${candidateName} | Senior Backend Architect & AI Systems Specialist`,
-        meta_description: `Learn more about ${candidateName}'s technical journey, 3+ years production expertise in Node.js, TypeScript, Express, Supabase pgvector, and cloud microservices.`,
-        meta_keywords: `About ${candidateName}, Backend Engineer Bio, Node.js Expert, Gemini AI RAG Engineer, Supabase pgvector Specialist`,
-        og_title: `About ${candidateName} - Senior Backend & AI Architect`,
-        og_description: `3+ years engineering scalable backend systems, async retry queues, and multimodal vector search engines.`,
-        og_image: "https://www.abhishektiwari.online/og-about-image.jpg",
+        meta_title: `About Abhishek Tiwari | Full Stack & AI Systems Engineer`,
+        meta_description: `Learn more about Abhishek Tiwari's technical journey, expertise in React, Node.js, TypeScript, Laravel, and cloud microservices.`,
+        meta_keywords: `About Abhishek Tiwari, Full Stack Developer Bio, Node.js Expert, React Developer, Gemini AI Engineer`,
+        og_title: `About Abhishek Tiwari - Full Stack & AI Engineer`,
+        og_description: `Building scalable web platforms, booking systems, and AI integrations.`,
+        og_image: "https://www.abhishektiwari.online/og.png",
         canonical_url: "https://www.abhishektiwari.online/about",
         structured_jsonld: {
           "@context": "https://schema.org",
@@ -712,19 +711,19 @@ app.post("/api/seo/sync", async (req, res) => {
           "mainEntity": {
             "@type": "Person",
             "name": candidateName,
-            "jobTitle": "Senior Backend Architect",
+            "jobTitle": "Full Stack Developer",
             "description": analysis.profileStrengths.join(" ")
           }
         }
       },
       {
         page_route: "/#contact",
-        meta_title: `Contact ${candidateName} | Hire Senior Backend Developer & AI LLM Consultant`,
-        meta_description: `Get in touch with ${candidateName} for senior backend developer roles, AI system architecture, microservices engineering, and technical consulting. Available for high-impact remote engagements.`,
-        meta_keywords: `Contact ${candidateName}, Hire Senior Backend Developer, Node.js Consultant, AI Developer Hire, Tech Consultant`,
-        og_title: `Contact ${candidateName} - Hire Senior Backend & AI LLM Developer`,
-        og_description: `Available for senior backend engineering roles, AI microservice architecture, and technical consulting.`,
-        og_image: "https://www.abhishektiwari.online/og-contact-image.jpg",
+        meta_title: `Contact Abhishek Tiwari | Full Stack & AI Developer`,
+        meta_description: `Get in touch with Abhishek Tiwari for full stack development, web platforms, AI integrations, and technical consulting.`,
+        meta_keywords: `Contact Abhishek Tiwari, Hire Full Stack Developer, React Node Consultant, AI Developer Hire`,
+        og_title: `Contact Abhishek Tiwari - Full Stack & AI Developer`,
+        og_description: `Available for full stack engineering projects and technical consulting.`,
+        og_image: "https://www.abhishektiwari.online/og.png",
         canonical_url: "https://www.abhishektiwari.online/#contact",
         structured_jsonld: {
           "@context": "https://schema.org",
@@ -734,7 +733,7 @@ app.post("/api/seo/sync", async (req, res) => {
           "mainEntity": {
             "@type": "Person",
             "name": candidateName,
-            "email": "contact@abhishektiwari.online"
+            "email": "abhishektiwari1540@gmail.com"
           }
         }
       }
