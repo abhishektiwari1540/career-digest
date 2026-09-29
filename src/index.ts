@@ -28,7 +28,7 @@ import { sendDigestEmail } from "./report/email.js";
 
 import { getOrGenerateContentPack } from "./llm/contentEngine.js";
 
-async function run() {
+export async function run() {
   const today = new Date().toISOString().slice(0, 10);
   console.log(`[career-digest] starting run for ${today}`);
 

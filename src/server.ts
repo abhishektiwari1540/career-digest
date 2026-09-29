@@ -44,6 +44,8 @@ import {
   setSelfUpdatingActive,
   startSelfUpdatingEngine,
 } from "./engine/selfUpdatingEngine.js";
+import { run as executeFullDigestRun } from "./index.js";
+
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -898,7 +900,17 @@ app.all("/api/cron/daily", async (req, res) => {
 
   try {
     const status = await forceTriggerSelfUpdate();
-    res.json({ success: true, message: "Vercel Daily Cron executed successfully", status });
+    // Await full data collection pipeline (Jobs, Trends, Events, Brand SEO, Supabase, Email)
+    await executeFullDigestRun().catch((err) => {
+      console.error("[server] Cron digest run error:", err.message);
+    });
+
+    res.json({
+      success: true,
+      message: "Vercel Cron executed successfully & Supabase database updated!",
+      status,
+      timestamp: new Date().toISOString()
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
