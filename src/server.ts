@@ -45,6 +45,12 @@ import {
   startSelfUpdatingEngine,
 } from "./engine/selfUpdatingEngine.js";
 import { run as executeFullDigestRun } from "./index.js";
+import {
+  generate12BlogCandidatesWorkflow,
+  fetchLatestChampionBlog,
+  fetchAllBlogCandidates,
+} from "./llm/dailyBlogEngine.js";
+
 
 
 
@@ -87,7 +93,11 @@ app.use("/api", (req, res, next) => {
     "/google-search",
     "/upload",
     "/cron/daily",
-    "/self-update/trigger"
+    "/self-update/trigger",
+    "/blogs/champion",
+    "/blogs/candidates",
+    "/blogs/generate",
+    "/blogs/sync"
   ];
   if (openPaths.includes(req.path)) {
     return next();
@@ -932,6 +942,89 @@ app.all("/api/cron/daily", async (req, res) => {
       message: "Vercel Cron executed successfully & Supabase database updated!",
       status,
       timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/blogs/champion - Retrieve the #1 Ranked Daily Champion Blog (Used by https://www.abhishektiwari.online/)
+app.get("/api/blogs/champion", async (req, res) => {
+  try {
+    const champion = await fetchLatestChampionBlog();
+    res.json({
+      success: true,
+      targetPortfolio: "https://www.abhishektiwari.online/",
+      champion,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/blogs/candidates - Retrieve all 12 candidate blogs and their SEO benchmark scores
+app.get("/api/blogs/candidates", async (req, res) => {
+  try {
+    const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const candidates = await fetchAllBlogCandidates(date);
+    res.json({
+      success: true,
+      date,
+      count: candidates.length,
+      candidates,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/blogs/generate - Trigger 12-Blog Candidate Competition & Self-Judging Cycle
+app.post("/api/blogs/generate", async (req, res) => {
+  try {
+    const result = await generate12BlogCandidatesWorkflow();
+    res.json({
+      success: true,
+      message: "Generated 12 candidate blogs & selected Daily Champion!",
+      champion: result.champion,
+      candidatesCount: result.candidates.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/blogs/sync - Webhook Sync Daily Champion Blog to https://www.abhishektiwari.online/
+app.post("/api/blogs/sync", async (req, res) => {
+  try {
+    const webhookUrl = req.body?.webhookUrl || process.env.PORTFOLIO_BLOG_WEBHOOK_URL;
+    const champion = await fetchLatestChampionBlog();
+
+    let webhookStatus = "No webhook URL specified (saved in Supabase & served via /api/blogs/champion API)";
+    if (webhookUrl) {
+      try {
+        const hookRes = await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event: "DAILY_CHAMPION_BLOG_PUBLISH",
+            targetSite: "https://www.abhishektiwari.online/",
+            publishedAt: new Date().toISOString(),
+            blog: champion,
+          }),
+        });
+        webhookStatus = hookRes.ok ? `Delivered to webhook (${hookRes.status})` : `Webhook HTTP error (${hookRes.status})`;
+      } catch (err: any) {
+        webhookStatus = `Webhook dispatch error: ${err.message}`;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "Daily Champion Blog synchronized!",
+      targetSite: "https://www.abhishektiwari.online/",
+      champion,
+      webhookStatus,
+      apiEndpoint: "https://career-digest.vercel.app/api/blogs/champion",
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
