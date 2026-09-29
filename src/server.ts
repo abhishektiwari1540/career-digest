@@ -100,11 +100,21 @@ app.use("/api", (req, res, next) => {
     "/blogs/sync"
   ];
   const currentPath = req.path || "";
-  const origUrl = req.originalUrl || "";
+  const origUrl = req.originalUrl || req.url || "";
+  const fullPath = `${currentPath} ${origUrl}`.toLowerCase();
+
   const isPublicRoute =
-    openPaths.some((p) => currentPath === p || currentPath.startsWith(p) || origUrl.includes(p)) ||
-    currentPath.startsWith("/blogs") ||
-    origUrl.includes("/blogs/");
+    fullPath.includes("/blogs") ||
+    fullPath.includes("/stats") ||
+    fullPath.includes("/memories") ||
+    fullPath.includes("/search") ||
+    fullPath.includes("/seo") ||
+    fullPath.includes("/reading-stats") ||
+    fullPath.includes("/self-update") ||
+    fullPath.includes("/track-reading") ||
+    fullPath.includes("/google-search") ||
+    fullPath.includes("/upload") ||
+    fullPath.includes("/cron/daily");
 
   if (isPublicRoute) {
     return next();
