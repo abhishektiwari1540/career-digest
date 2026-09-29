@@ -75,8 +75,27 @@ app.use((req, res, next) => {
 
 // Security Middleware 2: Guard API routes with secret header check option
 app.use("/api", (req, res, next) => {
-  const openPaths = ["/stats", "/memories", "/search", "/seo-profile", "/seo/sync", "/reading-stats", "/self-update/status", "/track-reading", "/google-search", "/upload"];
+  const openPaths = [
+    "/stats",
+    "/memories",
+    "/search",
+    "/seo-profile",
+    "/seo/sync",
+    "/reading-stats",
+    "/self-update/status",
+    "/track-reading",
+    "/google-search",
+    "/upload",
+    "/cron/daily",
+    "/self-update/trigger"
+  ];
   if (openPaths.includes(req.path)) {
+    return next();
+  }
+
+  const isVercelCron = Boolean(req.headers["x-vercel-cron"]);
+  const isCronJobOrg = (req.headers["user-agent"] || "").toLowerCase().includes("cron-job");
+  if (isVercelCron || isCronJobOrg) {
     return next();
   }
 
@@ -890,7 +909,10 @@ app.get("/api/reading-stats", async (req, res) => {
 // ALL /api/cron/daily - Vercel Scheduled Daily Cron Route Handler
 app.all("/api/cron/daily", async (req, res) => {
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && cronSecret.trim() !== "") {
+  const isVercelCron = Boolean(req.headers["x-vercel-cron"]);
+  const isCronJobOrg = (req.headers["user-agent"] || "").toLowerCase().includes("cron-job");
+
+  if (cronSecret && cronSecret.trim() !== "" && !isVercelCron && !isCronJobOrg) {
     const authHeader = req.headers.authorization;
     const clientSecret = req.headers["x-second-brain-secret"] || (authHeader ? authHeader.replace("Bearer ", "") : req.query.secret);
     if (clientSecret !== cronSecret) {
