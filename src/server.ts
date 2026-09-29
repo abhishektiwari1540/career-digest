@@ -99,7 +99,14 @@ app.use("/api", (req, res, next) => {
     "/blogs/generate",
     "/blogs/sync"
   ];
-  if (openPaths.some((p) => req.path === p || req.path.startsWith(p))) {
+  const currentPath = req.path || "";
+  const origUrl = req.originalUrl || "";
+  const isPublicRoute =
+    openPaths.some((p) => currentPath === p || currentPath.startsWith(p) || origUrl.includes(p)) ||
+    currentPath.startsWith("/blogs") ||
+    origUrl.includes("/blogs/");
+
+  if (isPublicRoute) {
     return next();
   }
 
