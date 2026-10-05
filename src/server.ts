@@ -50,6 +50,11 @@ import {
   fetchLatestChampionBlog,
   fetchAllBlogCandidates,
 } from "./llm/dailyBlogEngine.js";
+import {
+  generate10ViralPostsWorkflow,
+  fetchLatestViralPosts,
+} from "./llm/viralPostEngine.js";
+
 
 
 
@@ -104,6 +109,7 @@ app.use("/api", (req, res, next) => {
   const fullPath = `${currentPath} ${origUrl}`.toLowerCase();
 
   const isPublicRoute =
+    fullPath.includes("/viral-posts") ||
     fullPath.includes("/blogs") ||
     fullPath.includes("/stats") ||
     fullPath.includes("/memories") ||
@@ -1042,6 +1048,38 @@ app.post("/api/blogs/sync", async (req, res) => {
       champion,
       webhookStatus,
       apiEndpoint: "https://career-digest.vercel.app/api/blogs/champion",
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/viral-posts/candidates - Retrieve 10 viral post candidates & auto-publish results
+app.get("/api/viral-posts/candidates", async (req, res) => {
+  try {
+    const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const candidates = await fetchLatestViralPosts(date);
+    res.json({
+      success: true,
+      date,
+      count: candidates.length,
+      candidates,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/viral-posts/generate - Trigger 10-Post Viral Competition & Auto-Publish Winner Across All Platforms
+app.post("/api/viral-posts/generate", async (req, res) => {
+  try {
+    const result = await generate10ViralPostsWorkflow();
+    res.json({
+      success: true,
+      message: "Generated 10 viral posts & published #1 Winner across all connected platforms!",
+      winner: result.winner,
+      publishResults: result.publishResults,
+      candidatesCount: result.candidates.length,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

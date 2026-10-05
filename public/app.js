@@ -568,6 +568,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     fetchStats();
+    loadViralPostsSection();
   }
 
   // Render Skill Learning Roadmap Sequence
@@ -1418,6 +1419,70 @@ document.addEventListener("DOMContentLoaded", () => {
     const el = document.getElementById("champion-markdown-preview");
     if (el) el.style.display = el.style.display === "none" ? "block" : "none";
   };
+
+  // SECTION 3: 10-POST VIRAL COMPETITION & JAIPURDEVS AUTO-PUBLISHER
+  async function loadViralPostsSection() {
+    const viralGrid = document.getElementById("viral-posts-grid");
+    const viralBtn = document.getElementById("generate-viral-posts-btn");
+    const viralStatus = document.getElementById("viral-gen-status");
+
+    try {
+      const res = await fetch("/api/viral-posts/candidates");
+      const data = await res.json();
+      if (data.success && data.candidates && data.candidates.length > 0) {
+        if (viralGrid) {
+          viralGrid.innerHTML = data.candidates.map((c, idx) => `
+            <div class="metric-card" style="background: ${c.is_winner || c.isWinner ? 'rgba(16,185,129,0.1)' : 'rgba(15,23,42,0.6)'}; border-color: ${c.is_winner || c.isWinner ? '#10b981' : 'var(--card-border)'};">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                <span class="status-badge ${c.is_winner || c.isWinner ? 'active' : 'live'}" style="font-size:0.75rem;">
+                  ${c.is_winner || c.isWinner ? '🏆 #1 VIRAL WINNER' : `CANDIDATE #${idx + 1}`}
+                </span>
+                <span style="font-weight:800; font-family:'Outfit',sans-serif; color:${c.virality_score >= 85 ? '#10b981' : '#38bdf8'}; font-size:1.1rem;">
+                  ${c.virality_score || c.viralityScore}/100 Marks
+                </span>
+              </div>
+              <h4 style="color:#fff; font-family:'Outfit',sans-serif; font-size:1rem; margin-bottom:0.4rem;">${escapeHtml(c.title)}</h4>
+              <p style="font-size:0.85rem; color:var(--text-light); line-height:1.5; margin-bottom:0.75rem;">${escapeHtml(c.hook_text || c.hookText)}</p>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.5rem;">
+                Hashtags: ${(c.hashtags || []).slice(0, 4).join(" ")}
+              </div>
+              ${c.is_winner || c.isWinner ? `
+                <div style="margin-top:0.75rem; background:rgba(0,0,0,0.3); padding:0.6rem; border-radius:6px; border-left:3px solid #10b981; font-size:0.78rem; color:#10b981;">
+                  ✅ Auto-Published to Dev.to (JaipurDevs Org), LinkedIn, X, Reddit, Bluesky & Mastodon!
+                </div>
+              ` : ''}
+            </div>
+          `).join("");
+        }
+      }
+    } catch (err) {
+      console.warn("Viral posts fetch warning:", err);
+    }
+
+    if (viralBtn) {
+      viralBtn.onclick = async () => {
+        viralBtn.disabled = true;
+        if (viralStatus) viralStatus.style.display = "block";
+        viralBtn.innerHTML = `<span>⏳</span> Evaluating 10 Posts & Auto-Publishing...`;
+        try {
+          const res = await fetch("/api/viral-posts/generate", { method: "POST" });
+          const data = await res.json();
+          if (data.success) {
+            alert(`🎉 Successfully evaluated 10 viral post candidates & auto-published #1 Winner across Dev.to (JaipurDevs Org) & multi-platform networks!\n\nWinner Title: "${data.winner?.title}"`);
+            loadViralPostsSection();
+          } else {
+            alert(`Viral post workflow error: ${data.error}`);
+          }
+        } catch (err) {
+          alert(`Error: ${err.message}`);
+        } finally {
+          viralBtn.disabled = false;
+          if (viralStatus) viralStatus.style.display = "none";
+          viralBtn.innerHTML = `<span>⚡</span> Generate 10 Posts & Auto-Publish Winner Now`;
+        }
+      };
+    }
+  }
 
   function escapeHtml(str) {
     if (!str) return "";

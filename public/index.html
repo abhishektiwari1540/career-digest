@@ -332,10 +332,37 @@
           </div>
 
           <!-- SECTION 2: UNIVERSAL PLATFORM ADAPTERS -->
-          <div style="margin-top: 2rem; border-top: 1px solid var(--card-border); pt-1.5rem;">
+          <div style="margin-top: 2rem; border-top: 1px solid var(--card-border); padding-top: 1.5rem;">
             <h3 class="subsection-title" style="margin-bottom:1rem;">🔌 Universal Auto-Post Platform Adapters Status</h3>
             <div class="platforms-grid" id="platforms-grid">
               <p class="placeholder-text">Loading platform adapters...</p>
+            </div>
+          </div>
+
+          <!-- SECTION 3: DAILY 10-POST VIRAL COMPETITION & JAIPURDEVS AUTO-PUBLISHER -->
+          <div style="margin-top: 2.5rem; border-top: 1px solid var(--card-border); padding-top: 1.5rem;">
+            <div style="background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(99,102,241,0.12)); border: 1px solid rgba(16,185,129,0.3); padding: 1.5rem; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+              <div>
+                <span style="font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:#10b981; font-weight:700;">🚀 DAILY 10-POST VIRAL COMPETITION ENGINE</span>
+                <h3 style="font-family:'Outfit',sans-serif; color:#fff; margin-top:0.25rem;">Compare 10 Posts & Auto-Publish #1 Winner (Dev.to / JaipurDevs Org & All Platforms)</h3>
+                <p style="font-size:0.88rem; color:var(--text-muted); margin-top:0.2rem;">Generates 10 post variations daily, evaluates virality scores (0-100), selects the #1 winner, and auto-posts across Dev.to (JaipurDevs Org), LinkedIn, X, Reddit, Bluesky & Mastodon!</p>
+              </div>
+              <button class="btn primary-btn" id="generate-viral-posts-btn" style="background:linear-gradient(135deg, #10b981, #059669); padding:0.65rem 1.3rem; font-weight:700; display:flex; align-items:center; gap:0.5rem; box-shadow:0 4px 15px rgba(16,185,129,0.4);">
+                <span>⚡</span> Generate 10 Posts & Auto-Publish Winner Now
+              </button>
+            </div>
+
+            <!-- Status Indicator -->
+            <div id="viral-gen-status" style="display:none; margin-top:1.25rem; background:rgba(16,185,129,0.1); border:1px solid #10b981; padding:1rem; border-radius:10px; color:#10b981; font-weight:600;">
+              ⏳ Generating 10 viral developer post candidates, scoring virality marks out of 100, and publishing #1 Winner to Dev.to (JaipurDevs Org) & multi-platform networks... Please wait (~10-15s).
+            </div>
+
+            <!-- Grid of 10 Evaluated Viral Posts -->
+            <div style="margin-top: 1.5rem;">
+              <h3 class="subsection-title" style="margin-bottom:1rem;">📊 Today's 10 Evaluated Post Candidates & Virality Benchmark Scores</h3>
+              <div id="viral-posts-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:1.25rem;">
+                <p class="placeholder-text">Click "Generate 10 Posts & Auto-Publish Winner Now" to run the competition!</p>
+              </div>
             </div>
           </div>
         </div>

@@ -28,12 +28,36 @@ export class DevToPublisher implements SocialPublisher {
         .filter(Boolean)
         .slice(0, 4);
 
+      let orgId = process.env.DEVTO_ORGANIZATION_ID ? Number(process.env.DEVTO_ORGANIZATION_ID) : undefined;
+
+      // Auto-detect JaipurDevs organization if not explicitly provided
+      if (!orgId) {
+        try {
+          const orgsRes = await fetch("https://dev.to/api/organizations", {
+            headers: { "api-key": apiKey }
+          });
+          if (orgsRes.ok) {
+            const orgs = await orgsRes.json();
+            const jaipurOrg = orgs.find((o: any) =>
+              (o.name || "").toLowerCase().includes("jaipur") || (o.slug || "").toLowerCase().includes("jaipur")
+            );
+            if (jaipurOrg) {
+              orgId = jaipurOrg.id;
+              console.log(`[publisher:devto] Auto-detected Dev.to Organization '${jaipurOrg.name}' (ID: ${orgId})`);
+            }
+          }
+        } catch {
+          // ignore auto-detect error
+        }
+      }
+
       const articlePayload = {
         article: {
           title: payload.title || payload.text.split("\n")[0].slice(0, 80) || "Daily Technical Digest & Insights",
           published: true,
           body_markdown: payload.text,
           tags: tags.length > 0 ? tags : ["webdev"],
+          ...(orgId ? { organization_id: orgId } : {}),
           ...(payload.mediaUrl ? { main_image: payload.mediaUrl } : {}),
         },
       };
