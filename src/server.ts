@@ -86,43 +86,22 @@ app.use((req, res, next) => {
 
 // Security Middleware 2: Guard API routes with secret header check option
 app.use("/api", (req, res, next) => {
-  const openPaths = [
-    "/stats",
-    "/memories",
-    "/search",
-    "/seo-profile",
-    "/seo/sync",
-    "/reading-stats",
-    "/self-update/status",
-    "/track-reading",
-    "/google-search",
-    "/upload",
-    "/cron/daily",
-    "/self-update/trigger",
-    "/blogs/champion",
-    "/blogs/candidates",
-    "/blogs/generate",
-    "/blogs/sync"
-  ];
-  const currentPath = req.path || "";
-  const origUrl = req.originalUrl || req.url || "";
-  const fullPath = `${currentPath} ${origUrl}`.toLowerCase();
+  const urlPath = `${req.url || ''} ${req.path || ''} ${req.originalUrl || ''}`.toLowerCase();
 
-  const isPublicRoute =
-    fullPath.includes("/viral-posts") ||
-    fullPath.includes("/blogs") ||
-    fullPath.includes("/stats") ||
-    fullPath.includes("/memories") ||
-    fullPath.includes("/search") ||
-    fullPath.includes("/seo") ||
-    fullPath.includes("/reading-stats") ||
-    fullPath.includes("/self-update") ||
-    fullPath.includes("/track-reading") ||
-    fullPath.includes("/google-search") ||
-    fullPath.includes("/upload") ||
-    fullPath.includes("/cron/daily");
-
-  if (isPublicRoute) {
+  // Allow all public dashboard & auto-post endpoints without requiring API_SECRET
+  if (
+    urlPath.includes("viral-posts") ||
+    urlPath.includes("blogs") ||
+    urlPath.includes("stats") ||
+    urlPath.includes("memories") ||
+    urlPath.includes("search") ||
+    urlPath.includes("seo") ||
+    urlPath.includes("reading") ||
+    urlPath.includes("self-update") ||
+    urlPath.includes("google-search") ||
+    urlPath.includes("upload") ||
+    urlPath.includes("cron")
+  ) {
     return next();
   }
 
