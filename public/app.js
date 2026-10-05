@@ -1413,6 +1413,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       };
     }
+
+    const copyEmbedBtn = document.getElementById("copy-blog-embed-code-btn");
+    if (copyEmbedBtn) {
+      copyEmbedBtn.onclick = () => {
+        const text = document.getElementById("blog-embed-code-text")?.textContent || `<script src="https://career-digest.vercel.app/blog-embed.js"></script>`;
+        navigator.clipboard.writeText(text);
+        copyEmbedBtn.textContent = "✅ Copied!";
+        setTimeout(() => { copyEmbedBtn.textContent = "📋 Copy Embed Code"; }, 2000);
+      };
+    }
   }
 
   window.toggleChampionContent = function() {
