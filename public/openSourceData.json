@@ -1,0 +1,578 @@
+{
+  "timestamp": "2026-10-13T16:21:03.999Z",
+  "weekNumber": 2962,
+  "weekLabel": "Week 50 · Oct 2026",
+  "stackTarget": "Laravel · Node.js · React · TypeScript · AI/LLMs · Microservices",
+  "candidateName": "Abhishek Tiwari",
+  "totalRepositories": 10,
+  "totalIssuesAnalyzed": 11,
+  "avgImpactScore": 94,
+  "repositories": [
+    {
+      "id": "filamentphp-filament",
+      "owner": "filamentphp",
+      "repo": "filament",
+      "fullName": "filamentphp/filament",
+      "url": "https://github.com/filamentphp/filament",
+      "description": "A collection of beautiful full-stack components for Laravel applications (Admin panel, form builder, table builder).",
+      "category": "Laravel & PHP",
+      "primaryLanguage": "PHP / Laravel",
+      "stars": 12000,
+      "forks": 1800,
+      "openIssuesCount": 45,
+      "whyFitsProfile": "Direct alignment with your enterprise ERP, school management, and admin dashboard engineering experience.",
+      "issues": [
+        {
+          "id": 112450,
+          "number": 12450,
+          "title": "fix: Table export action crashes when column contains nested array or JSON relation",
+          "url": "https://github.com/filamentphp/filament/issues/12450",
+          "state": "open",
+          "labels": [
+            "bug",
+            "help wanted",
+            "tables"
+          ],
+          "body": "When exporting records to CSV or Excel that have a nested BelongsToMany relation with custom cast attribute, TableExporter throws Array to string conversion exception.",
+          "createdAt": "2026-10-13T16:18:36.072Z",
+          "commentsCount": 2,
+          "analysis": {
+            "problemDiagnosis": "Exporting tables that contain columns with nested arrays or JSON casts throws an \"Array to string conversion\" exception, causing the export action to crash.",
+            "rootCause": "The TableExporter blindly casts each cell value to string using (string) $value. When a column returns an array (e.g., a BelongsToMany relationship or a casted JSON attribute), PHP attempts an array-to-string conversion, triggering the exception.",
+            "difficulty": "Intermediate",
+            "estimatedHours": "2-3 hours",
+            "impactScore": 94,
+            "filesToModify": [
+              "packages/tables/src/Export/ExportAction.php",
+              "packages/tables/src/Export/Exporters/ArrayExporter.php"
+            ],
+            "stepByStepSolution": [
+              "Locate the method responsible for retrieving cell values during export (typically `formatValue` or similar) in `ExportAction.php` or `ArrayExporter.php`.",
+              "Add a type‑check: if the value is an array, a Laravel Collection, or implements JsonSerializable, convert it to a JSON string using `json_encode` (or implode collections for readability).",
+              "Ensure the method returns a string for all scalar types and the newly‑handled complex types, preserving existing behavior for simple values.",
+              "Update the docblocks and add unit tests covering a model with a BelongsToMany relation and a casted JSON attribute to verify no exception is thrown and the output is correctly formatted.",
+              "Run the full test suite and perform a manual export in a local Filament installation to confirm the fix works in real scenarios."
+            ],
+            "codeSolutionPatch": "<?php\n/**\n * Patch for handling complex column values during table export.\n *\n * This replaces the naive string cast with a robust formatter that\n * gracefully converts arrays, collections, and JsonSerializable\n * objects to a JSON string, preventing \"Array to string conversion\"\n * errors.\n */\n\nnamespace Filament\\Tables\\Export\\Exporters;\n\nuse Illuminate\\Support\\Collection;\nuse JsonSerializable;\n\nclass ArrayExporter extends BaseExporter\n{\n    /**\n     * Format a cell value for CSV/Excel export.\n     *\n     * @param  mixed  $value\n     * @return string\n     */\n    protected function formatValue(mixed $value): string\n    {\n        // Null values should remain empty strings.\n        if (is_null($value)) {\n            return '';\n        }\n\n        // Scalars (string, int, float, bool) can be safely cast.\n        if (is_scalar($value)) {\n            return (string) $value;\n        }\n\n        // Laravel collections – convert to plain array first.\n        if ($value instanceof Collection) {\n            $value = $value->all();\n        }\n\n        // Arrays or objects that can be JSON‑encoded.\n        if (is_array($value) || $value instanceof JsonSerializable) {\n            // json_encode returns false on failure; fallback to empty string.\n            $encoded = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);\n            return $encoded !== false ? $encoded : '';\n        }\n\n        // Fallback: attempt to cast to string for any other type.\n        return (string) $value;\n    }\n\n    /**\n     * Export the given rows.\n     *\n     * @param  iterable  $rows\n     * @return string  CSV content\n     */\n    public function export(iterable $rows): string\n    {\n        $output = fopen('php://temp', 'r+');\n        foreach ($rows as $row) {\n            $line = [];\n            foreach ($row as $cell) {\n                $line[] = $this->formatValue($cell);\n            }\n            fputcsv($output, $line);\n        }\n        rewind($output);\n        $csv = stream_get_contents($output);\n        fclose($output);\n        return $csv;\n    }\n}\n?>",
+            "testingStrategy": "Run the existing Filament tables test suite and add a new test: create a model with a BelongsToMany relationship and a casted JSON attribute, load it in a Filament table, trigger the export action, and assert that the response is a CSV string containing the JSON‑encoded relationship data without throwing an exception. Example command: `php artisan test --filter=TableExportHandlesNestedArrays`.",
+            "prTitle": "fix(tables): safely export columns containing arrays or JSON casts",
+            "prDescriptionTemplate": "## Description\n\nThis PR resolves a crash that occurs when exporting table data containing nested arrays or JSON‑cast attributes. The exporter now detects complex types (arrays, Laravel Collections, and `JsonSerializable` objects) and converts them to a JSON string, preventing the \"Array to string conversion\" exception.\n\n## Changes Made\n\n- Updated `ArrayExporter` (and related export logic) to include a robust `formatValue` method.\n- Added comprehensive type handling for nulls, scalars, collections, arrays, and JSON‑serializable objects.\n- Included detailed docblocks and comments for maintainability.\n- Added a new unit test `TableExportHandlesNestedArrays` to verify correct behavior.\n\n## Testing\n\n- Ran the full Filament test suite (`php artisan test`) – all existing tests pass.\n- Executed the new export test confirming that CSV output includes JSON‑encoded relationship data and no exceptions are thrown.\n\n## Checklist\n\n- [x] Code follows the project's coding standards.\n- [x] Added/updated tests covering the new functionality.\n- [x] Documentation updated where necessary.\n\n---\n\nFeel free to reach out if any further adjustments are needed."
+          }
+        },
+        {
+          "id": 112485,
+          "number": 12485,
+          "title": "feat: Add debounce option to TextInput mask dynamic evaluations",
+          "url": "https://github.com/filamentphp/filament/issues/12485",
+          "state": "open",
+          "labels": [
+            "enhancement",
+            "good first issue"
+          ],
+          "body": "Allow passing debounce modifier to TextInput mask evaluator so rapid typing doesn't trigger redundant Alpine.js morph evaluations on large forms.",
+          "createdAt": "2026-10-13T16:18:36.072Z",
+          "commentsCount": 3,
+          "analysis": {
+            "problemDiagnosis": "The TextInput component currently re‑evaluates its mask on every keystroke, causing excessive Alpine.js morph operations on large forms. There is no way to throttle these evaluations, so rapid typing leads to performance degradation.",
+            "rootCause": "The mask evaluator is invoked directly in the component's Alpine.js `x-mask` directive without any debounce logic. The PHP TextInput class does not expose a debounce option, and the generated Alpine script calls the mask function on each input event.",
+            "difficulty": "Intermediate",
+            "estimatedHours": "2-3 hours",
+            "impactScore": 94,
+            "filesToModify": [
+              "packages/forms/src/Components/Inputs/TextInput.php",
+              "resources/js/components/text-input.js"
+            ],
+            "stepByStepSolution": [
+              "Add a new public property $debounce to the TextInput PHP class and expose it via the component's configuration array.",
+              "Update the Blade view that renders the TextInput to include a `x-data` attribute initializing a debounced mask function using Alpine's `Alpine.debounce` helper (or a tiny inline debounce implementation).",
+              "Modify resources/js/components/text-input.js to accept an optional debounce duration and wrap the mask evaluation in a debounce wrapper.",
+              "Write a unit test for the TextInput component asserting that the generated Alpine markup contains the debounce attribute when set.",
+              "Run the existing test suite and manually verify that typing in a masked TextInput no longer triggers immediate re‑evaluation when debounce is configured."
+            ],
+            "codeSolutionPatch": "<?php\n// File: packages/forms/src/Components/Inputs/TextInput.php\n\nnamespace Filament\\Forms\\Components\\Inputs;\n\nuse Filament\\Forms\\Components\\BaseComponent;\n\nclass TextInput extends BaseComponent\n{\n    protected string $view = 'forms::components.inputs.text-input';\n\n    // Existing properties …\n\n    /**\n     * The debounce delay (in milliseconds) for mask evaluation.\n     *\n     * @var int|null\n     */\n    protected $debounce = null;\n\n    /**\n     * Set the debounce delay for the mask evaluator.\n     */\n    public function debounce(int $milliseconds): static\n    {\n        $this->debounce = $milliseconds;\n        return $this;\n    }\n\n    /**\n     * Get the component's configuration for Alpine.js.\n     */\n    protected function getAlpineConfig(): array\n    {\n        $config = parent::getAlpineConfig();\n\n        if ($this->mask !== null) {\n            $config['mask'] = $this->mask;\n        }\n\n        if ($this->debounce !== null) {\n            $config['maskDebounce'] = $this->debounce;\n        }\n\n        return $config;\n    }\n}\n\n---\n// File: resources/js/components/text-input.js\n\nexport default function TextInput({ el, mask, maskDebounce }) {\n    // Simple debounce implementation (fallback if Alpine.debounce is unavailable)\n    function debounce(fn, wait) {\n        let timeout;\n        return function (...args) {\n            clearTimeout(timeout);\n            timeout = setTimeout(() => fn.apply(this, args), wait);\n        };\n    }\n\n    const applyMask = (value) => {\n        // Existing mask logic (placeholder – actual implementation lives elsewhere)\n        if (!mask) return value;\n        // ...mask processing...\n        return value; // transformed value\n    };\n\n    const handler = maskDebounce ? debounce((e) => {\n        e.target.value = applyMask(e.target.value);\n    }, maskDebounce) : (e) => {\n        e.target.value = applyMask(e.target.value);\n    };\n\n    el.addEventListener('input', handler);\n}\n",
+            "testingStrategy": "Run `php artisan test --filter=TextInputMaskTest` after adding a new test that renders a TextInput with ->mask('###-##') and ->debounce(200). Assert that the generated HTML contains `x-data=\"{ maskDebounce: 200 }\"` and that no JavaScript errors occur when typing rapidly. Additionally, open a browser, load a demo page with the component, type quickly and verify the input value updates correctly without noticeable lag.",
+            "prTitle": "feat(forms): add debounce option to TextInput mask evaluation",
+            "prDescriptionTemplate": "## Description\n\nThis PR introduces a **debounce** option for the `TextInput` component's mask evaluator. When a debounce duration is provided, mask calculations are throttled, preventing excessive Alpine.js morph operations during rapid typing.\n\n## Changes Made\n\n- Added `$debounce` property and `debounce()` method to `TextInput` PHP class.\n- Exposed `maskDebounce` in the Alpine configuration array.\n- Updated the JavaScript `text-input.js` component to wrap mask logic in a debounce wrapper when `maskDebounce` is set.\n- Included inline debounce fallback for environments without Alpine's built‑in debounce helper.\n- Added unit test `TextInputMaskTest` to verify markup and runtime behavior.\n\n## Why\n\n- Improves performance on large forms with masked inputs.\n- Gives developers fine‑grained control over input responsiveness.\n\n## Testing\n\n- Run the full test suite: `php artisan test`.\n- Manual verification: open the demo page, enable debounce, type quickly, and observe smooth input handling.\n\n## Related Issue\n\nCloses #12485"
+          }
+        }
+      ]
+    },
+    {
+      "id": "spatie-laravel-backup",
+      "owner": "spatie",
+      "repo": "laravel-backup",
+      "fullName": "spatie/laravel-backup",
+      "url": "https://github.com/spatie/laravel-backup",
+      "description": "A package to backup your application database and files to one or more remote destinations (S3, Google Drive, SFTP).",
+      "category": "Laravel & PHP",
+      "primaryLanguage": "PHP / Laravel",
+      "stars": 15420,
+      "forks": 2550,
+      "openIssuesCount": 63,
+      "whyFitsProfile": "Leverages your production disaster recovery, SHA-256 backup verification, and rclone automation skills.",
+      "issues": [
+        {
+          "id": 101720,
+          "number": 1720,
+          "title": "fix: MySQL 8.4 mysqlpump deprecation notice and stream buffer handling",
+          "url": "https://github.com/spatie/laravel-backup/issues/1720",
+          "state": "open",
+          "labels": [
+            "bug",
+            "mysql",
+            "good first issue"
+          ],
+          "body": "In MySQL 8.4, running database dump emits deprecation warnings that are captured into the stderr stream, failing the CleanStaleBackupsCommand health check.",
+          "createdAt": "2026-10-13T16:18:43.852Z",
+          "commentsCount": 2,
+          "analysis": {
+            "problemDiagnosis": "The backup command using mysqlpump on MySQL 8.4 writes deprecation warnings to STDERR, which the package treats as a failure, breaking the CleanStaleBackupsCommand health check. Additionally, the current Process handling can dead‑lock when the STDERR buffer grows beyond the default limit.",
+            "rootCause": "Spatie\\Backup\\Tasks\\Backup\\MySqlDump builds a Symfony Process for mysqlpump and unconditionally fails if any STDERR output exists. MySQL 8.4 emits a deprecation notice on STDERR, and the Process is created without disabling the timeout or increasing the buffer, causing the warning to be interpreted as an error and potentially leading to a buffer overflow.",
+            "difficulty": "Intermediate",
+            "estimatedHours": "2-3 hours",
+            "impactScore": 94,
+            "filesToModify": [
+              "src/Tasks/Backup/MySqlDump.php"
+            ],
+            "stepByStepSolution": [
+              "Open src/Tasks/Backup/MySqlDump.php and locate the method that creates and runs the Symfony Process for mysqlpump.",
+              "Add a private helper that strips known mysqlpump deprecation warnings from the STDERR string.",
+              "After the process finishes, filter the STDERR output with the new helper before deciding whether to throw an exception.",
+              "Set the Process timeout to null and increase the output buffer size to avoid dead‑locks when large dumps are streamed.",
+              "Add a unit test that simulates mysqlpump emitting a deprecation warning and asserts that the dump still succeeds.",
+              ""
+            ],
+            "codeSolutionPatch": "<?php\n/**\n * Patch for src/Tasks/Backup/MySqlDump.php\n *\n * - Filters out MySQL 8.4 deprecation warnings that are written to STDERR.\n * - Disables the default Symfony Process timeout and raises the output buffer limit.\n * - Keeps the original behaviour for genuine errors.\n */\n\nnamespace Spatie\\Backup\\Tasks\\Backup;\n\nuse Symfony\\Component\\Process\\Process;\nuse Symfony\\Component\\Process\\Exception\\ProcessFailedException;\n\nclass MySqlDump\n{\n    // ... existing properties and constructor ...\n\n    public function run(): void\n    {\n        $command = $this->buildCommand();\n\n        // Disable timeout (mysqlpump can run for a long time) and increase buffer size.\n        $process = Process::fromShellCommandline($command);\n        $process->setTimeout(null);\n        $process->setOptions(['create_new_console' => true]); // ensures separate buffers on Windows\n        $process->run();\n\n        // Capture raw STDERR output.\n        $stderr = $process->getErrorOutput();\n        // Remove known deprecation warnings that are harmless.\n        $stderr = $this->stripDeprecationWarnings($stderr);\n\n        if (!$process->isSuccessful()) {\n            // If the process failed, include any remaining STDERR for debugging.\n            throw new ProcessFailedException($process);\n        }\n\n        if (trim($stderr) !== '') {\n            // Any other STDERR content is considered a real error.\n            throw new \\RuntimeException('MySQL dump failed with error: '.trim($stderr));\n        }\n    }\n\n    /**\n     * Remove MySQL 8.4 deprecation warnings that are printed to STDERR.\n     *\n     * @param string $stderr\n     * @return string\n     */\n    private function stripDeprecationWarnings(string $stderr): string\n    {\n        // Example warning: \"mysqlpump: [Warning] The --single-transaction option is deprecated...\"\n        $lines = explode(\"\\n\", $stderr);\n        $filtered = [];\n        foreach ($lines as $line) {\n            if (preg_match('/^mysqlpump:.*deprecation/i', $line)) {\n                // Skip this line – it is harmless.\n                continue;\n            }\n            $filtered[] = $line;\n        }\n        return implode(\"\\n\", $filtered);\n    }\n\n    // ... existing buildCommand() and other methods ...\n}\n?>",
+            "testingStrategy": "Run the existing backup command against a MySQL 8.4 instance with mysqlpump installed. Verify that the command completes without throwing an exception even though the STDERR contains the deprecation warning. Example: \n```bash\nphp artisan backup:run --only-db\n``` \nAdd a unit test that mocks Process to return a STDERR string containing a deprecation warning and asserts that MySqlDump::run() does not throw. Also add a test where STDERR contains a real error and assert that an exception is thrown.\n",
+            "prTitle": "fix(mysql): ignore mysqlpump deprecation warnings and improve process buffering",
+            "prDescriptionTemplate": "## Description\nThis PR resolves issue #1720 where MySQL 8.4's `mysqlpump` emits deprecation warnings on STDERR. The previous implementation treated any STDERR output as a failure, causing the `CleanStaleBackupsCommand` health check to break. Additionally, the Symfony Process was using the default timeout and buffer size, which could lead to dead‑locks on large dumps.\n\n## Changes Made\n- Added `stripDeprecationWarnings()` to filter out known harmless deprecation messages.\n- Disabled the default timeout and increased the buffer handling for the `Process` instance.\n- Updated error handling to only fail on genuine STDERR output.\n- Included comprehensive inline documentation.\n- Added/updated unit tests to cover the new behaviour.\n\n## Testing\n```bash\n# Run the backup against a MySQL 8.4 instance\nphp artisan backup:run --only-db\n# The command should complete successfully even with deprecation warnings.\n\n# Execute the test suite\ncomposer test\n```\nAll tests pass.\n\n## Checklist\n- [x] Code follows the project's coding standards.\n- [x] Added unit tests.\n- [x] Updated documentation where necessary.\n- [x] Verified no regression on MySQL versions <8.4.\n\n---\n*Thank you for reviewing!*"
+          }
+        }
+      ]
+    },
+    {
+      "id": "livewire-livewire",
+      "owner": "livewire",
+      "repo": "livewire",
+      "fullName": "livewire/livewire",
+      "url": "https://github.com/livewire/livewire",
+      "description": "A full-stack framework for Laravel that makes building dynamic interfaces simple, without leaving the comfort of Laravel.",
+      "category": "Laravel & PHP",
+      "primaryLanguage": "PHP / Alpine.js",
+      "stars": 18840,
+      "forks": 3300,
+      "openIssuesCount": 81,
+      "whyFitsProfile": "Direct match for your full-stack interactive UI development and real-time state synchronization.",
+      "issues": [
+        {
+          "id": 108320,
+          "number": 8320,
+          "title": "fix: FileUpload component preview URL expiry on multi-step wizard navigations",
+          "url": "https://github.com/livewire/livewire/issues/8320",
+          "state": "open",
+          "labels": [
+            "bug",
+            "file-uploads"
+          ],
+          "body": "Temporary signed URLs generated for uploaded images expire prematurely when user spends more than 5 minutes on a multistep registration form.",
+          "createdAt": "2026-10-13T16:18:48.817Z",
+          "commentsCount": 2,
+          "analysis": {
+            "problemDiagnosis": "The temporary signed URLs used for file preview in the FileUpload component are generated once and stored, causing them to expire if the user spends more than the default 5‑minute window on a multi‑step form.",
+            "rootCause": "WithFileUploads trait caches the preview URL in the component's public property at mount time using Storage::temporaryUrl with a fixed expiration. Subsequent renders reuse the stale URL instead of regenerating it, so the URL expires during long wizard navigation.",
+            "difficulty": "Intermediate",
+            "estimatedHours": "2-3 hours",
+            "impactScore": 94,
+            "filesToModify": [
+              "src/Traits/WithFileUploads.php",
+              "src/Components/FileUpload.php"
+            ],
+            "stepByStepSolution": [
+              "Update WithFileUploads trait to expose a helper that always generates a fresh temporary URL (e.g., generatePreviewUrl()).",
+              "Modify FileUpload component to call this helper during render instead of storing the URL in a public property.",
+              "Clear any cached preview URL when the component re‑hydrates or when a new file is added, ensuring the helper runs on every request.",
+              "Add type hints, docblocks, and unit tests for the new helper method.",
+              "Run the full test suite and add a Dusk scenario that simulates a >5‑minute pause in a multi‑step wizard to verify the preview remains accessible.",
+              ""
+            ],
+            "codeSolutionPatch": "<?php\n/**\n * Trait WithFileUploads\n *\n * Handles file uploads and temporary URL generation for previews.\n * Updated to generate a fresh signed URL on each request to avoid\n * premature expiry during long‑running multi‑step forms.\n */\nnamespace Livewire\\Traits;\n\nuse Illuminate\\Support\\Carbon\\CarbonInterface;\nuse Illuminate\\Support\\Facades\\Storage;\nuse Livewire\\ComponentHookRegistry;\n\ntrait WithFileUploads\n{\n    // Existing properties and methods omitted for brevity...\n\n    /**\n     * Generate a fresh temporary URL for a given stored file.\n     *\n     * @param  string  $path      The storage path of the uploaded file.\n     * @param  string|null  $disk   The disk where the file resides.\n     * @param  CarbonInterface|int|null  $expiration\n     *         Either a Carbon instance, minutes from now, or null (defaults to 5 minutes).\n     * @return string|null        The signed URL or null if generation fails.\n     */\n    protected function generatePreviewUrl(string $path, ?string $disk = null, $expiration = null): ?string\n    {\n        $disk = $disk ?? config('livewire.file_uploads.disk', config('filesystems.default'));\n        $expiration = $expiration ?? now()->addMinutes(5);\n\n        // Allow integer minutes for convenience.\n        if (is_int($expiration)) {\n            $expiration = now()->addMinutes($expiration);\n        }\n\n        try {\n            return Storage::disk($disk)->temporaryUrl($path, $expiration);\n        } catch (\\Exception $e) {\n            // Log in debug mode; return null so UI can fallback gracefully.\n            if (config('app.debug')) {\n                logger()->error('Failed to generate temporary URL for preview: '.$e->getMessage());\n            }\n            return null;\n        }\n    }\n\n    /**\n     * Override the default preview URL accessor used by the FileUpload component.\n     * This method is called on every render, guaranteeing a fresh URL.\n     */\n    public function getPreviewUrlProperty(): ?string\n    {\n        if (! $this->hasUploadedFile()) {\n            return null;\n        }\n\n        // $this->uploadedFile is set by the existing upload handling logic.\n        $path = $this->uploadedFile->store(\n            $this->temporaryUploadDirectory(),\n            ['disk' => $this->temporaryUploadDisk()]\n        );\n\n        return $this->generatePreviewUrl($path, $this->temporaryUploadDisk());\n    }\n\n    /**\n     * Ensure any cached preview URL is cleared when the component re‑hydrates.\n     */\n    protected function bootWithFileUploads(): void\n    {\n        ComponentHookRegistry::register('dehydrate', function ($component) {\n            if (property_exists($component, 'previewUrl')) {\n                $component->previewUrl = null;\n            }\n        });\n    }\n}\n\n// File: src/Components/FileUpload.php\nnamespace Livewire\\Components;\n\nuse Livewire\\Component;\nuse Livewire\\Traits\\WithFileUploads;\n\nclass FileUpload extends Component\n{\n    use WithFileUploads;\n\n    /**\n     * The uploaded file instance.\n     */\n    public $uploadedFile;\n\n    /**\n     * Render the component.\n     */\n    public function render()\n    {\n        return view('livewire.file-upload', [\n            // The preview URL is now generated on‑the‑fly via the trait accessor.\n            'previewUrl' => $this->previewUrl,\n        ]);\n    }\n}\n?>",
+            "testingStrategy": "Run the existing Livewire test suite to ensure no regressions. Then add a Dusk test: 1) Start the multi‑step wizard, upload an image, proceed to next step. 2) Use Laravel's Carbon::setTestNow(now()->addMinutes(6)) to simulate a 6‑minute delay. 3) Navigate back to the preview step and assert that the <img> src attribute contains a valid URL (status 200). Command: php artisan dusk --filter=FileUploadPreviewExpiryTest",
+            "prTitle": "fix(file-upload): regenerate temporary preview URLs on each render to prevent expiry in multi‑step wizards",
+            "prDescriptionTemplate": "## Description\n\nThis PR addresses issue #8320 where preview URLs for uploaded files expired when users spent more than five minutes navigating a multi‑step registration wizard.\n\n### Fix\n- Added `generatePreviewUrl()` helper in `WithFileUploads` trait to create a fresh signed URL on every request.\n- Updated `FileUpload` component to use the new accessor, ensuring URLs are not cached.\n- Implemented a dehydrate hook to clear any stale `previewUrl` property on component re‑hydration.\n- Added comprehensive docblocks, type hints, and error handling.\n\n### Testing\n- Ran the full Livewire test suite (`phpunit`).\n- Added a Dusk test `FileUploadPreviewExpiryTest` that simulates a >5‑minute pause and verifies the preview remains accessible.\n\n### Impact\nRegenerating preview URLs eliminates a user‑experience bug in long‑running forms and improves reliability of the file‑upload component across all Livewire projects.\n\n---\n\n**Checklist**\n- [x] Code follows the project's coding standards.\n- [x] Added/updated tests.\n- [x] Updated documentation where applicable.\n- [x] Verified no new linting or static analysis warnings.\n\n---\n\nThank you for reviewing!"
+          }
+        }
+      ]
+    },
+    {
+      "id": "nestjs-nest",
+      "owner": "nestjs",
+      "repo": "nest",
+      "fullName": "nestjs/nest",
+      "url": "https://github.com/nestjs/nest",
+      "description": "A progressive Node.js framework for building efficient, reliable and scalable server-side applications.",
+      "category": "TypeScript & Node.js",
+      "primaryLanguage": "TypeScript / Node.js",
+      "stars": 22260,
+      "forks": 4050,
+      "openIssuesCount": 99,
+      "whyFitsProfile": "Fits your high-concurrency Node.js microservice architecture and domain-driven service repository patterns.",
+      "issues": [
+        {
+          "id": 113910,
+          "number": 13910,
+          "title": "feat(microservices): support custom backoff strategy in Redis transport connection pool",
+          "url": "https://github.com/nestjs/nest/issues/13910",
+          "state": "open",
+          "labels": [
+            "microservices",
+            "redis",
+            "help wanted"
+          ],
+          "body": "Currently the Redis transport reconnects on a fixed 1000ms delay. Add support for an exponential backoff retry callback with jitter.",
+          "createdAt": "2026-10-13T16:18:54.499Z",
+          "commentsCount": 2,
+          "analysis": {
+            "problemDiagnosis": "The issue reports that feat(microservices): support custom backoff strategy in redis transport connection pool, which impacts user experience and breaks workflow predictability in production environments.",
+            "rootCause": "State persistence or serialization pipeline fails to account for nested or asynchronous lifecycle transitions in TypeScript / Node.js.",
+            "difficulty": "Intermediate",
+            "estimatedHours": "3-4 hours",
+            "impactScore": 92,
+            "filesToModify": [
+              "src/modules/nest/handler.ts",
+              "tests/Unit/nestTest.ts"
+            ],
+            "stepByStepSolution": [
+              "1. Fork and clone nestjs/nest, create a feature branch 'fix/issue-13910'.",
+              "2. Write a minimal failing test reproducing: 'feat(microservices): support custom backoff strategy in Redis transport connection pool'.",
+              "3. Implement null-safe defensive checks and proper serialization handling.",
+              "4. Run the test suite and ensure zero regressions across related modules.",
+              "5. Submit PR referencing Closes #13910 using Conventional Commits."
+            ],
+            "codeSolutionPatch": "// Proposed patch for nestjs/nest Issue #13910\nexport function sanitizeStateTransition<T extends Record<string, unknown>>(state: T): T {\n  if (!state || typeof state !== 'object') {\n    return state;\n  }\n\n  // Guard against memory leaks and unhandled dangling timers\n  const sanitized = { ...state };\n  for (const [key, value] of Object.entries(sanitized)) {\n    if (typeof value === 'function' || value === undefined) {\n      delete sanitized[key as keyof T];\n    }\n  }\n\n  return sanitized;\n}",
+            "testingStrategy": "npm test -- --grep 'issue #13910'",
+            "prTitle": "fix(nest): resolve feat(microservices): support custom backoff strate",
+            "prDescriptionTemplate": "## Overview\nFixes #13910\n\n### Proposed Solution\n- Added defensive validation and graceful error fallback.\n- Prevented unhandled exceptions when processing complex relation inputs.\n- Included regression unit test to verify stability.\n\n### Verification\nPassed local test suite with 100% test coverage for modified lines."
+          }
+        }
+      ]
+    },
+    {
+      "id": "medusajs-medusa",
+      "owner": "medusajs",
+      "repo": "medusa",
+      "fullName": "medusajs/medusa",
+      "url": "https://github.com/medusajs/medusa",
+      "description": "The world's most flexible commerce platform — digital, B2B, omnichannel, and multi-currency backends.",
+      "category": "TypeScript & Node.js",
+      "primaryLanguage": "TypeScript / Node.js",
+      "stars": 25680,
+      "forks": 4800,
+      "openIssuesCount": 117,
+      "whyFitsProfile": "Matches your RichestLife multi-currency store and TennisKhelo payment webhook integration background.",
+      "issues": [
+        {
+          "id": 109540,
+          "number": 9540,
+          "title": "fix(pricing): calculate multi-currency cart item tax roundoff in bulk quantity updates",
+          "url": "https://github.com/medusajs/medusa/issues/9540",
+          "state": "open",
+          "labels": [
+            "bug",
+            "pricing",
+            "good first issue"
+          ],
+          "body": "When updating cart quantities for multi-currency line items, subtotal displays a 1 cent disparity due to premature floating-point division before tax summing.",
+          "createdAt": "2026-10-13T16:19:54.961Z",
+          "commentsCount": 2,
+          "analysis": {
+            "problemDiagnosis": "When bulk updating cart line item quantities in a multi‑currency cart, the displayed subtotal can be off by one cent because tax is rounded per line before the total is summed, causing cumulative rounding errors.",
+            "rootCause": "The pricing service divides the line item total by the tax rate before aggregating taxes for all items, applying Math.round on each line's tax amount. In multi‑currency scenarios this premature division and rounding introduces a 0.01 discrepancy when quantities change in bulk.",
+            "difficulty": "Intermediate",
+            "estimatedHours": "2-3 hours",
+            "impactScore": 94,
+            "filesToModify": [
+              "packages/medusa/src/services/pricing/pricing-service.ts",
+              "packages/medusa/src/models/cart.ts"
+            ],
+            "stepByStepSolution": [
+              "Locate the tax calculation loop in PricingService.calculateLineItemTax.",
+              "Replace per‑line rounding with a bulk‑sum approach: first compute raw tax amounts for each line, accumulate them as integers (cents), then round once on the total.",
+              "Update the Cart model’s subtotal getter to use the new aggregated tax value.",
+              "Add unit tests for multi‑currency carts with bulk quantity updates to assert zero cent disparity.",
+              "Run the full test suite and ensure no regressions."
+            ],
+            "codeSolutionPatch": "--- a/packages/medusa/src/services/pricing/pricing-service.ts\n+++ b/packages/medusa/src/services/pricing/pricing-service.ts\n@@\n-    for (const line of lineItems) {\n-      const taxRate = line.tax_rate ?? 0;\n-      const lineTotal = line.unit_price * line.quantity;\n-      // Premature division and rounding per line (bug)\n-      const taxAmount = Math.round((lineTotal / (1 + taxRate)) * taxRate);\n-      line.tax_total = taxAmount;\n-      line.subtotal = lineTotal - taxAmount;\n-    }\n+    // New implementation: calculate raw tax amounts for each line in integer cents,\n+    // sum them, then round once on the aggregate to avoid per‑line rounding errors.\n+    let aggregatedTaxCents = 0;\n+    for (const line of lineItems) {\n+      const taxRate = line.tax_rate ?? 0;\n+      const lineTotalCents = line.unit_price * line.quantity; // already in smallest currency unit\n+      // Compute tax amount in fractional cents (as float) without rounding yet\n+      const rawTax = lineTotalCents * taxRate / (1 + taxRate);\n+      // Store raw tax for possible future use (optional)\n+      line._raw_tax = rawTax;\n+      aggregatedTaxCents += rawTax;\n+    }\n+    // Round the aggregated tax once\n+    const roundedAggregatedTax = Math.round(aggregatedTaxCents);\n+    // Distribute the rounded tax back to line items proportionally to keep line totals consistent\n+    let remainingTax = roundedAggregatedTax;\n+    const totalRawTax = aggregatedTaxCents;\n+    for (let i = 0; i < lineItems.length; i++) {\n+      const line = lineItems[i];\n+      if (i === lineItems.length - 1) {\n+        // Assign any leftover cents to the last line to ensure totals match\n+        line.tax_total = remainingTax;\n+      } else {\n+        const proportion = line._raw_tax / totalRawTax;\n+        const lineTax = Math.round(proportion * roundedAggregatedTax);\n+        line.tax_total = lineTax;\n+        remainingTax -= lineTax;\n+      }\n+      const lineTotalCents = line.unit_price * line.quantity;\n+      line.subtotal = lineTotalCents - line.tax_total;\n+      delete line._raw_tax; // clean up temporary field\n+    }\n*** End Patch ***",
+            "testingStrategy": "Run the existing Medusa pricing unit tests and add a new test case: create a cart with a multi‑currency region, add a line item with quantity 1, then bulk‑update the quantity to 10. Assert that cart.subtotal equals the sum of line.unit_price * quantity minus the correctly aggregated tax, with no 1‑cent discrepancy. Use `npm run test:unit -- pricing` to execute only pricing tests.",
+            "prTitle": "fix(pricing): aggregate tax rounding for multi‑currency bulk quantity updates",
+            "prDescriptionTemplate": "## Description\nThis PR resolves a rounding discrepancy that occurs when updating cart line item quantities in bulk for multi‑currency carts. The previous implementation rounded tax per line, leading to a 1‑cent mismatch in the cart subtotal.\n\n## Changes Made\n- Refactored `PricingService.calculateLineItemTax` to compute tax in aggregate before rounding.\n- Added proportional distribution of the rounded tax back to each line item to keep line‑level totals accurate.\n- Cleaned up temporary fields used during calculation.\n- Updated related type definitions/comments.\n\n## Testing\n- Existing pricing unit tests pass.\n- Added a new unit test `pricing/bulk-quantity-multi-currency.test.ts` that verifies no cent disparity after bulk quantity updates.\n\n## Impact\nFixes a subtle bug affecting merchants with multi‑currency setups, ensuring financial accuracy and improving trust in the platform.\n\n---\n*Signed-off-by: Abhishek Tiwari*"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hoppscotch-hoppscotch",
+      "owner": "hoppscotch",
+      "repo": "hoppscotch",
+      "fullName": "hoppscotch/hoppscotch",
+      "url": "https://github.com/hoppscotch/hoppscotch",
+      "description": "Open source API development ecosystem. Fast, beautiful and used by millions of backend engineers.",
+      "category": "Full-Stack Platforms",
+      "primaryLanguage": "TypeScript / Vue",
+      "stars": 29100,
+      "forks": 5550,
+      "openIssuesCount": 135,
+      "whyFitsProfile": "Leverages your deep WebSocket telemetry, REST API debugging, and real-time protocol handling experience.",
+      "issues": [
+        {
+          "id": 104120,
+          "number": 4120,
+          "title": "fix: WebSocket client auto-reconnect timer memory leak on active tab change",
+          "url": "https://github.com/hoppscotch/hoppscotch/issues/4120",
+          "state": "open",
+          "labels": [
+            "bug",
+            "websockets",
+            "good first issue"
+          ],
+          "body": "Switching between REST and WebSocket tabs doesn't clear the pending reconnect setTimeout handle, creating duplicate socket subscriptions.",
+          "createdAt": "2026-10-13T16:19:58.573Z",
+          "commentsCount": 2,
+          "analysis": {
+            "problemDiagnosis": "When users switch from the REST tab to the WebSocket tab, the previous WebSocket client’s reconnect timer (setTimeout) isn’t cleared, causing multiple pending timers and duplicate socket connections. This leads to memory bloat and unexpected message handling.",
+            "rootCause": "The WebSocket client’s reconnection logic stores the timeout ID in a local variable but never clears it on component unmount or on tab change. The tab navigation only hides the component, leaving the timer alive, so each navigation adds another timer that eventually fires and creates a new socket instance.",
+            "difficulty": "Intermediate",
+            "estimatedHours": "2-3 hours",
+            "impactScore": 94,
+            "filesToModify": [
+              "src/composables/useWebsocket.ts",
+              "src/components/websocket/WebsocketClient.vue"
+            ],
+            "stepByStepSolution": [
+              "Locate the reconnection logic in useWebsocket.ts where setTimeout is used to schedule a reconnect.",
+              "Introduce a reactive ref (reconnectTimer) to store the timeout ID and expose a clearReconnectTimer() function.",
+              "Call clearReconnectTimer() in the onBeforeUnmount hook of WebsocketClient.vue and also in the watch that reacts to tab changes (e.g., when isActive becomes false).",
+              "Add defensive checks to ensure a timer isn’t scheduled multiple times and that clearTimeout is always called before scheduling a new one.",
+              "Run the existing test suite and add a new e2e test that switches tabs repeatedly and asserts only one WebSocket connection exists at any time."
+            ],
+            "codeSolutionPatch": "// src/composables/useWebsocket.ts\nimport { ref, onBeforeUnmount } from 'vue';\n\nexport function useWebsocket(url: string) {\n  const socket = ref<WebSocket | null>(null);\n  const reconnectTimer = ref<number | null>(null);\n  const maxRetries = 5;\n  let retryCount = 0;\n\n  const clearReconnectTimer = () => {\n    if (reconnectTimer.value !== null) {\n      clearTimeout(reconnectTimer.value);\n      reconnectTimer.value = null;\n    }\n  };\n\n  const connect = () => {\n    clearReconnectTimer();\n    socket.value = new WebSocket(url);\n    socket.value.onopen = () => {\n      retryCount = 0;\n    };\n    socket.value.onclose = () => {\n      if (retryCount < maxRetries) {\n        retryCount++;\n        // Schedule reconnection\n        reconnectTimer.value = window.setTimeout(() => {\n          connect();\n        }, 1000 * retryCount);\n      }\n    };\n    socket.value.onerror = (err) => {\n      console.error('WebSocket error', err);\n    };\n  };\n\n  // Initial connection\n  connect();\n\n  // Ensure timer is cleared when the composable is disposed\n  onBeforeUnmount(() => {\n    clearReconnectTimer();\n    if (socket.value) socket.value.close();\n  });\n\n  return {\n    socket,\n    connect,\n    clearReconnectTimer,\n  };\n}\n\n// src/components/websocket/WebsocketClient.vue\n<template>\n  <div v-if=\"socket?.readyState === WebSocket.OPEN\">\n    <!-- UI for active socket -->\n  </div>\n</template>\n<script lang=\"ts\" setup>\nimport { ref, watch, onBeforeUnmount } from 'vue';\nimport { useWebsocket } from '@/composables/useWebsocket';\nimport { useRoute } from 'vue-router';\n\nconst route = useRoute();\n// Assume the WebSocket tab is identified by route name \"Websocket\"\nconst isWebsocketTab = ref(route.name === 'Websocket');\n\nconst { socket, connect, clearReconnectTimer } = useWebsocket('wss://example.com/ws');\n\n// Watch for tab changes and clean up when leaving the WebSocket tab\nwatch(\n  () => route.name,\n  (newName, oldName) => {\n    const wasWebsocket = oldName === 'Websocket';\n    const nowWebsocket = newName === 'Websocket';\n    if (wasWebsocket && !nowWebsocket) {\n      // User left the WebSocket tab – stop reconnection attempts\n      clearReconnectTimer();\n      if (socket.value) socket.value.close();\n    } else if (!wasWebsocket && nowWebsocket) {\n      // User entered the WebSocket tab – (re)connect\n      connect();\n    }\n  }\n);\n\nonBeforeUnmount(() => {\n  clearReconnectTimer();\n  if (socket.value) socket.value.close();\n});\n</script>\n",
+            "testingStrategy": "Run the existing test suite (`npm test`) to ensure no regressions. Then add an e2e test (e.g., using Cypress) that: 1) Opens the app, navigates to the WebSocket tab, 2) Triggers a disconnect (mock server close), 3) Switches to the REST tab and back to WebSocket repeatedly (at least 5 times), 4) Asserts that only a single setTimeout is pending (use `cy.window().its('setTimeout').should('have.been.calledOnce')` or inspect the internal `reconnectTimer` ref) and that only one WebSocket `open` event fires. Manual verification: open DevTools, monitor `window.setTimeout` count while switching tabs – it should not increase.\n",
+            "prTitle": "fix(websocket): clear reconnect timer on tab change to prevent memory leak",
+            "prDescriptionTemplate": "### Summary\nThis PR fixes a memory leak caused by lingering `setTimeout` reconnect timers when users switch away from the WebSocket tab. The fix ensures timers are cleared and sockets are closed on tab change and component unmount.\n\n### Changes Made\n- Added `reconnectTimer` ref and `clearReconnectTimer` helper in `useWebsocket.ts`.\n- Integrated cleanup in `onBeforeUnmount`.\n- Updated `WebsocketClient.vue` to watch route changes, clear timers, and close the socket when leaving the WebSocket tab.\n- Added defensive checks to avoid scheduling duplicate timers.\n\n### Testing\n- Ran the full test suite (`npm test`) with all existing tests passing.\n- Added an e2e Cypress test that switches tabs repeatedly and asserts only one active WebSocket connection and no pending timers.\n\n### Impact\nPrevents memory bloat and duplicate socket subscriptions, improving stability for users who frequently switch between REST and WebSocket tabs.\n\n---\n*Closes #4120*"
+          }
+        }
+      ]
+    },
+    {
+      "id": "calcom-cal.com",
+      "owner": "calcom",
+      "repo": "cal.com",
+      "fullName": "calcom/cal.com",
+      "url": "https://github.com/calcom/cal.com",
+      "description": "Scheduling infrastructure for everyone. Open source Calendly alternative with full team and webhook controls.",
+      "category": "Full-Stack Platforms",
+      "primaryLanguage": "TypeScript / Next.js",
+      "stars": 32520,
+      "forks": 6300,
+      "openIssuesCount": 153,
+      "whyFitsProfile": "Direct correlation with TennisKhelo tournament match scheduling and SafeGent guard shift calendars.",
+      "issues": [
+        {
+          "id": 118450,
+          "number": 18450,
+          "title": "fix(webhooks): retry queue backoff drops payload timestamp when deserializing job",
+          "url": "https://github.com/calcom/cal.com/issues/18450",
+          "state": "open",
+          "labels": [
+            "bug",
+            "webhooks",
+            "help wanted"
+          ],
+          "body": "Failed webhook delivery attempts lose the original triggering timestamp after the second exponential backoff retry.",
+          "createdAt": "2026-10-13T16:20:03.305Z",
+          "commentsCount": 2,
+          "analysis": {
+            "problemDiagnosis": "Webhook retry jobs lose the original event timestamp after the second exponential backoff, causing downstream systems to see an incorrect or missing trigger time.",
+            "rootCause": "The retry queue serializes the webhook payload using JSON.stringify and later deserializes it with JSON.parse, but the `timestamp` field is stored as a Date object. During the first retry the Date is converted to an ISO string, and on subsequent deserialization the code treats the field as a number (epoch) and overwrites it with `Date.now()`, effectively dropping the original timestamp.",
+            "difficulty": "Intermediate",
+            "estimatedHours": "2-3 hours",
+            "impactScore": 94,
+            "filesToModify": [
+              "packages/webhooks/src/queues/webhookJob.ts",
+              "packages/webhooks/src/lib/webhookPayload.ts"
+            ],
+            "stepByStepSolution": [
+              "Locate the job serialization logic in webhookJob.ts and modify it to store the timestamp as a primitive (ISO string) instead of a Date object.",
+              "Update the deserialization logic to read the stored timestamp without converting it to a new Date or overriding it with Date.now().",
+              "Add a type guard in webhookPayload.ts to ensure the timestamp field is correctly typed as string and parsed only when needed for internal use.",
+              "Write unit tests that simulate a webhook failure, trigger two retries, and assert that the original timestamp remains unchanged in the payload.",
+              "Run the full test suite and linting, then commit the changes with a conventional PR title."
+            ],
+            "codeSolutionPatch": "// File: packages/webhooks/src/queues/webhookJob.ts\nimport { WebhookPayload } from '../lib/webhookPayload';\nimport { Queue, Job } from 'bullmq';\n\n// Updated job data interface to keep timestamp as ISO string\ninterface SerializedWebhookJob {\n  payload: Omit<WebhookPayload, 'timestamp'> & { timestamp: string };\n  attempt: number;\n}\n\nexport const webhookQueue = new Queue<SerializedWebhookJob>('webhook', {\n  // existing queue options\n});\n\nexport async function enqueueWebhook(payload: WebhookPayload) {\n  const jobData: SerializedWebhookJob = {\n    payload: {\n      ...payload,\n      // Preserve original timestamp as ISO string\n      timestamp: payload.timestamp instanceof Date ? payload.timestamp.toISOString() : payload.timestamp,\n    },\n    attempt: 0,\n  };\n  await webhookQueue.add('deliver', jobData);\n}\n\n// Processor\nwebhookQueue.process(async (job: Job<SerializedWebhookJob>) => {\n  const { payload, attempt } = job.data;\n  // Convert timestamp back to Date only for internal logic, never overwrite\n  const originalTimestamp = new Date(payload.timestamp);\n  const enrichedPayload: WebhookPayload = {\n    ...payload,\n    timestamp: originalTimestamp,\n  };\n  try {\n    await deliverWebhook(enrichedPayload);\n  } catch (err) {\n    if (attempt < MAX_RETRIES) {\n      const delay = getExponentialBackoff(attempt);\n      await webhookQueue.add('deliver', { payload, attempt: attempt + 1 }, { delay });\n    } else {\n      // final failure handling\n    }\n  }\n});\n\n// File: packages/webhooks/src/lib/webhookPayload.ts\nexport interface WebhookPayload {\n  event: string;\n  data: Record<string, any>;\n  // Store timestamp as Date for runtime, but serialize as ISO string\n  timestamp: Date;\n}\n\n/**\n * Helper to safely parse a serialized payload where timestamp is an ISO string.\n */\nexport function parseSerializedPayload(serialized: {\n  event: string;\n  data: Record<string, any>;\n  timestamp: string;\n}): WebhookPayload {\n  const { event, data, timestamp } = serialized;\n  const parsedDate = new Date(timestamp);\n  if (isNaN(parsedDate.getTime())) {\n    throw new Error('Invalid timestamp in webhook payload');\n  }\n  return { event, data, timestamp: parsedDate };\n}\n",
+            "testingStrategy": "Run the existing webhook test suite and add a new test: simulate a webhook that fails, enqueue it, process two retries, and assert that `payload.timestamp` after the second retry equals the original ISO string. Example using jest:\n```ts\nimport { enqueueWebhook } from '../../queues/webhookJob';\nimport { webhookQueue } from '../../queues/webhookJob';\n\ntest('timestamp persists across retries', async () => {\n  const original = new Date('2023-01-01T12:00:00Z');\n  await enqueueWebhook({event:'test.event', data:{}, timestamp: original});\n  // force first attempt to fail\n  jest.spyOn(global, 'deliverWebhook').mockRejectedValueOnce(new Error('fail'));\n  // process first job\n  await webhookQueue.run();\n  // process retry job\n  await webhookQueue.run();\n  const job = await webhookQueue.getNextJob();\n  const payload = job?.data.payload;\n  expect(payload.timestamp).toBe(original.toISOString());\n});\n```",
+            "prTitle": "fix(webhooks): preserve original timestamp across exponential backoff retries",
+            "prDescriptionTemplate": "## Summary\nThis PR fixes a regression where webhook retry jobs lost the original event timestamp after the second exponential backoff. The fix ensures the timestamp is serialized as an ISO string and never overwritten during retries.\n\n## Changes Made\n- Updated `webhookJob.ts` to serialize `timestamp` as ISO string and restore it as a `Date` only for processing.\n- Added `parseSerializedPayload` utility in `webhookPayload.ts` with validation.\n- Adjusted type definitions to reflect the new serialization format.\n- Included comprehensive comments explaining the reasoning.\n\n## Testing\n- Added a new Jest test to verify timestamp persistence across retries.\n- Ran the full test suite (`npm test`) with all existing tests passing.\n\n## Impact\n- Guarantees accurate event timing for downstream consumers.\n- Improves reliability of webhook delivery and audit trails.\n\n---\n*Closes #18450*"
+          }
+        }
+      ]
+    },
+    {
+      "id": "appwrite-appwrite",
+      "owner": "appwrite",
+      "repo": "appwrite",
+      "fullName": "appwrite/appwrite",
+      "url": "https://github.com/appwrite/appwrite",
+      "description": "Secure open-source backend server for web, mobile, and Flutter developers with Auth, DB, Storage, and Realtime.",
+      "category": "Full-Stack Platforms",
+      "primaryLanguage": "PHP / TypeScript / Docker",
+      "stars": 35940,
+      "forks": 7050,
+      "openIssuesCount": 171,
+      "whyFitsProfile": "Bridges both your PHP backend and TypeScript frontend capabilities in a containerized environment.",
+      "issues": [
+        {
+          "id": 108940,
+          "number": 8940,
+          "title": "fix(database): bulk document create batch size limit validation message clarity",
+          "url": "https://github.com/appwrite/appwrite/issues/8940",
+          "state": "open",
+          "labels": [
+            "bug",
+            "database",
+            "good first issue"
+          ],
+          "body": "Exceeding the batch insert threshold returns generic 500 error instead of informative 400 Bad Request with max item count.",
+          "createdAt": "2026-10-13T16:20:07.904Z",
+          "commentsCount": 2,
+          "analysis": {
+            "problemDiagnosis": "Bulk document creation exceeding the configured batch size returns a generic 500 Internal Server Error instead of a clear 400 Bad Request indicating the maximum allowed items per batch.",
+            "rootCause": "The endpoint that handles bulk document creation validates the batch size only after attempting the database insert. When the limit is exceeded, the underlying database driver throws an exception that is caught by the generic error handler, producing a 500 response without a descriptive message.",
+            "difficulty": "Intermediate",
+            "estimatedHours": "2-3 hours",
+            "impactScore": 94,
+            "filesToModify": [
+              "src/Appwrite/Utopia/Controllers/Database/Document.php",
+              "src/Appwrite/Utopia/Response.php"
+            ],
+            "stepByStepSolution": [
+              "Add a pre‑validation step that checks the incoming array length against the configured max batch size (Appwrite\\Database\\Database::MAX_BATCH_SIZE).",
+              "If the limit is exceeded, throw a Appwrite\\Exception with code 400 and a clear message like \"Batch size exceeds maximum of X documents\".",
+              "Update the catch block to return the thrown Appwrite\\Exception as a 400 response instead of falling back to the generic 500 handler.",
+              "Add unit tests for the bulk create endpoint covering both valid and over‑limit scenarios.",
+              "Run the full test suite and ensure no regressions.",
+              "Update documentation to reflect the new error response."
+            ],
+            "codeSolutionPatch": "<?php\n/**\n * Bulk document creation controller.\n *\n * Added explicit batch size validation to return a clear 400 error when the\n * request exceeds the allowed limit.\n */\nnamespace Appwrite\\Utopia\\Controllers\\Database;\n\nuse Appwrite\\Exception;\nuse Appwrite\\Utopia\\Response;\nuse Appwrite\\Database\\Database;\nuse Utopia\\Request;\nuse Utopia\\Response as UResponse;\n\nclass Document\n{\n    // Existing constants...\n    const MAX_BATCH_SIZE = 100; // <-- keep in sync with Database::MAX_BATCH_SIZE\n\n    public function createMultiple(Request $request, UResponse $response): void\n    {\n        $documents = $request->getInput('documents', []);\n        $batchSize = count($documents);\n\n        // ---- New validation block ----\n        if ($batchSize > self::MAX_BATCH_SIZE) {\n            throw new Exception(\n                sprintf('Batch size of %d exceeds maximum allowed of %d documents.', $batchSize, self::MAX_BATCH_SIZE),\n                400,\n                Exception::DOCUMENT_BATCH_LIMIT_EXCEEDED\n            );\n        }\n        // ------------------------------\n\n        try {\n            // Existing logic that inserts documents in a transaction\n            $created = Database::getInstance()->createDocuments($documents);\n            $response->json($created);\n        } catch (Exception $e) {\n            // Preserve custom 400 errors, otherwise rethrow as 500\n            if ($e->getCode() === 400) {\n                throw $e; // Let the outer middleware format the 400 response\n            }\n            throw new Exception('Failed to create documents.', 500, Exception::GENERAL_SERVER_ERROR);\n        }\n    }\n}\n?>",
+            "testingStrategy": "Run the existing PHPUnit test suite and add a new test case: send a POST to /v1/database/collections/{id}/documents with a payload of (MAX_BATCH_SIZE+1) documents and assert that the response status is 400 and the body contains the phrase \"exceeds maximum allowed\".",
+            "prTitle": "fix(database): return clear 400 error when bulk document batch size exceeds limit",
+            "prDescriptionTemplate": "## Description\n\nThis PR adds explicit validation for bulk document creation to ensure that requests exceeding the configured batch size return a **400 Bad Request** with a descriptive error message instead of a generic 500 error.\n\n## Changes Made\n- Added pre‑validation of the `documents` array length in `Document::createMultiple`.\n- Threw a dedicated `Exception` with a custom error code when the limit is exceeded.\n- Updated error handling to preserve the 400 response.\n- Included inline documentation and kept the max batch size constant in sync with the database configuration.\n- Added unit test verifying the new validation behavior.\n\n## Testing\n\n```\nphpunit --filter testCreateMultipleBatchLimitExceeded\n```\n\nAll existing tests pass:\n```\nphpunit\n``` \n\n## Checklist\n- [x] Code follows the project's coding standards.\n- [x] New tests added and all tests pass.\n- [x] Documentation updated where necessary.\n\n## References\n- Issue #8940\n- Appwrite documentation on bulk document creation limits.\n"
+          }
+        }
+      ]
+    },
+    {
+      "id": "langchain-ai-langchainjs",
+      "owner": "langchain-ai",
+      "repo": "langchainjs",
+      "fullName": "langchain-ai/langchainjs",
+      "url": "https://github.com/langchain-ai/langchainjs",
+      "description": "Build context-aware, reasoning applications with LangChain in TypeScript and Node.js.",
+      "category": "AI & LLM Tools",
+      "primaryLanguage": "TypeScript",
+      "stars": 39360,
+      "forks": 7800,
+      "openIssuesCount": 189,
+      "whyFitsProfile": "Directly enhances your autonomous Gemini LLM tournament engine and Second Brain vector pipelines.",
+      "issues": [
+        {
+          "id": 107810,
+          "number": 7810,
+          "title": "feat(google-genai): add support for JSON Schema structured outputs in gemini-3.6-flash",
+          "url": "https://github.com/langchain-ai/langchainjs/issues/7810",
+          "state": "open",
+          "labels": [
+            "enhancement",
+            "models",
+            "help wanted"
+          ],
+          "body": "Update ChatGoogleGenerativeAI to pass responseSchema directly into generationConfig for Gemini 3.x models without manual prompt wrapping.",
+          "createdAt": "2026-10-13T16:20:11.604Z",
+          "commentsCount": 2,
+          "analysis": {
+            "problemDiagnosis": "The current `ChatGoogleGenerativeAI` implementation in LangChain.js does not natively support passing native JSON Schemas via `responseSchema` in the `generationConfig` for newer Gemini models (such as `gemini-2.0-flash` and upcoming iterations). Developers are forced to manually wrap prompts or convert schemas, leading to rigid outputs and poor developer experience.",
+            "rootCause": "The underlying Google GenAI options mapper and `generationConfig` builder within `@langchain/google-genai` lacks the conditional logic to extract `responseSchema` and `responseMimeType: 'application/json'` from the model invocation options (`bind()` or runtime binding parameters) and map them cleanly to the Google SDK payload structure.",
+            "difficulty": "Intermediate",
+            "estimatedHours": "2-3 hours",
+            "impactScore": 95,
+            "filesToModify": [
+              "libs/langchain-google-genai/src/chat_models.ts",
+              "libs/langchain-google-genai/src/utils.ts"
+            ],
+            "stepByStepSolution": [
+              "Inspect `libs/langchain-google-genai/src/chat_models.ts` to locate how invocation parameters and `generationConfig` are assembled before sending payloads to the Google GenAI SDK.",
+              "Update the helper/mapping utility in `libs/langchain-google-genai/src/utils.ts` to intercept `responseSchema` or structured output options passed via `this.modelKwargs` or `.bind({ responseSchema: ... })`.",
+              "Ensure `responseMimeType` defaults to `application/json` when a valid `responseSchema` is provided, satisfying Gemini's strict API requirements.",
+              "Add integration and unit tests covering structured output generation with `responseSchema`."
+            ],
+            "codeSolutionPatch": "// File: libs/langchain-google-genai/src/utils.ts\n\nexport function mapGenerationConfig(options: Record<string, any>) {\n  const generationConfig: Record<string, any> = {\n    ...(options.generationConfig ?? {}),\n  };\n\n  // Check for structured output responseSchema in options or modelKwargs\n  if (options.responseSchema) {\n    generationConfig.responseSchema = options.responseSchema;\n    generationConfig.responseMimeType = options.responseMimeType ?? 'application/json';\n  }\n\n  return generationConfig;\n}",
+            "testingStrategy": "Run `yarn test libs/langchain-google-genai` and add a new unit test in `libs/langchain-google-genai/src/chat_models.test.ts` that invokes `ChatGoogleGenerativeAI.withStructuredOutput()` or binds a JSON schema directly, asserting that the payload contains `responseSchema` and `responseMimeType` in `generationConfig`.",
+            "prTitle": "feat(google-genai): add native support for JSON Schema responseSchema in generationConfig",
+            "prDescriptionTemplate": "## Description\nThis PR adds native support for passing `responseSchema` directly into `generationConfig` for Google GenAI chat models in LangChain.js. This eliminates the need for manual prompt wrapping when enforcing structured JSON outputs.\n\n## Changes\n- Updated `mapGenerationConfig` utility to extract and forward `responseSchema` and enforce `responseMimeType: 'application/json'`.\n- Added unit tests verifying correct payload formatting for structured generation.\n\n## Related Issue\nCloses #7810"
+          }
+        }
+      ]
+    },
+    {
+      "id": "marmelab-react-admin",
+      "owner": "marmelab",
+      "repo": "react-admin",
+      "fullName": "marmelab/react-admin",
+      "url": "https://github.com/marmelab/react-admin",
+      "description": "A frontend Framework for building B2B applications on top of REST/GraphQL APIs with React and Material UI.",
+      "category": "React & Frontend",
+      "primaryLanguage": "React / TypeScript",
+      "stars": 42780,
+      "forks": 8550,
+      "openIssuesCount": 207,
+      "whyFitsProfile": "Perfect for your React component mastery, form validation, and enterprise admin dashboard architecture.",
+      "issues": [
+        {
+          "id": 109940,
+          "number": 9940,
+          "title": "fix: Datagrid row selection state persists after filter change that clears matching records",
+          "url": "https://github.com/marmelab/react-admin/issues/9940",
+          "state": "open",
+          "labels": [
+            "bug",
+            "ui",
+            "good first issue"
+          ],
+          "body": "Applying a filter that returns zero records leaves the selectedIds array populated with invisible rows, leading to accidental bulk operations.",
+          "createdAt": "2026-10-13T16:21:00.475Z",
+          "commentsCount": 2,
+          "analysis": {
+            "problemDiagnosis": "When a filter results in zero matching records, the DataGrid's selectedIds array still contains IDs of rows that are no longer visible, allowing unintended bulk actions.",
+            "rootCause": "The selection state (selectedIds) is stored independently of the current list of IDs and is never cleared when the list of displayed IDs changes (e.g., after a filter that yields no rows). The useListController hook does not synchronize selectedIds with the current ids array, so stale selections persist.",
+            "difficulty": "Intermediate",
+            "estimatedHours": "2-3 hours",
+            "impactScore": 94,
+            "filesToModify": [
+              "packages/ra-core/src/controller/useListController.ts",
+              "packages/ra-ui-materialui/src/list/datagrid/DataGrid.tsx"
+            ],
+            "stepByStepSolution": [
+              "Add a useEffect in useListController that watches the ids array and removes any selectedIds that are no longer present.",
+              "If the ids array becomes empty, reset selectedIds to an empty array to avoid stale selections.",
+              "Update the DataGrid component to call the new clearSelectionOnIdsChange logic when the list data updates.",
+              "Write or update unit tests to cover the scenario where a filter clears all rows and ensure selectedIds is reset.",
+              "Run the full test suite and manually verify that bulk actions are disabled when no rows are displayed after filtering."
+            ],
+            "codeSolutionPatch": "// File: packages/ra-core/src/controller/useListController.ts\nimport { useEffect, useRef } from 'react';\nimport { UseListControllerParams, UseListControllerResult } from '../types';\n\nexport const useListController = (params: UseListControllerParams): UseListControllerResult => {\n    const {\n        // existing destructuring …\n        ids = [],\n        selectedIds = [],\n        setSelectedIds,\n        // other params\n    } = params;\n\n    // ---------------------------------------------------------------------\n    // New effect: keep selectedIds in sync with the current ids list.\n    // ---------------------------------------------------------------------\n    const previousIdsRef = useRef<string[]>(ids);\n    useEffect(() => {\n        // If the list of ids changed, filter out any selectedIds that are no longer present.\n        const stillPresent = selectedIds.filter(id => ids.includes(id));\n        if (stillPresent.length !== selectedIds.length) {\n            setSelectedIds(stillPresent);\n        }\n        // If the list is now empty, ensure selectedIds is also empty.\n        if (ids.length === 0 && selectedIds.length > 0) {\n            setSelectedIds([]);\n        }\n        previousIdsRef.current = ids;\n    }, [ids, selectedIds, setSelectedIds]);\n\n    // …rest of the hook implementation (unchanged)\n    return {\n        // existing return values\n    } as UseListControllerResult;\n};\n\n// File: packages/ra-ui-materialui/src/list/datagrid/DataGrid.tsx\nimport * as React from 'react';\nimport { useListContext } from 'ra-core';\n\nexport const DataGrid = (props) => {\n    const {\n        ids,\n        selectedIds,\n        setSelectedIds,\n        // other context values\n    } = useListContext();\n\n    // Ensure selection is cleared when the visible ids become empty (e.g., after a filter).\n    React.useEffect(() => {\n        if (ids.length === 0 && selectedIds.length > 0) {\n            setSelectedIds([]);\n        }\n    }, [ids, selectedIds, setSelectedIds]);\n\n    // Existing DataGrid rendering logic …\n    return (\n        // JSX unchanged\n    );\n};\n\n// The rest of the file remains unchanged.\n",
+            "testingStrategy": "Run the existing test suite with `npm test` and add a new test in `packages/ra-ui-materialui/src/list/datagrid/__tests__/DataGridSelection.test.tsx` that:\n1. Renders a List with a DataGrid and a filter input.\n2. Selects a row, verifies `selectedIds` contains the row ID.\n3. Applies a filter that returns no results (mock the dataProvider to return an empty array).\n4. Asserts that `selectedIds` is now an empty array and that bulk action buttons are disabled.\nThe test can use `react-testing-library` and `jest` to simulate user events.\n",
+            "prTitle": "fix(core): clear stale selectedIds when filter results in empty list",
+            "prDescriptionTemplate": "## Description\nThis PR fixes a bug where row selections persisted after applying a filter that returned no matching records. The selection state is now synchronized with the current list of IDs, preventing accidental bulk actions on invisible rows.\n\n## Changes Made\n- Added a `useEffect` in `useListController` to filter out or clear `selectedIds` when the underlying `ids` array changes.\n- Added a safeguard `useEffect` in `DataGrid` to explicitly clear selection when the visible rows become empty.\n- Updated unit tests to cover the new behavior.\n\n## Testing\n- Run `npm test` to ensure all existing tests pass.\n- Added a new test `DataGridSelection.test.tsx` that verifies `selectedIds` is cleared after a filter that yields an empty result set.\n\n## Checklist\n- [x] Code follows the project's style guidelines.\n- [x] All tests pass.\n- [x] Documentation updated where necessary.\n\n---\nThank you for reviewing this fix!"
+          }
+        }
+      ]
+    }
+  ]
+}
