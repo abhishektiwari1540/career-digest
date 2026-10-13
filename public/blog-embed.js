@@ -4,7 +4,9 @@
  * Injects a live "Blog" tab, floating widget, and structured BlogPosting JSON-LD schema.
  */
 (function () {
-  const API_ENDPOINT = "https://career-digest.vercel.app/api/blogs/champion";
+  const API_ENDPOINT = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+    ? "/api/blogs/champion"
+    : "https://career-digest.vercel.app/api/blogs/champion";
 
   async function initBlogEmbed() {
     try {

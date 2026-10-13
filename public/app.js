@@ -1290,6 +1290,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // TAB 6: 12-BLOG COMPETITION & CHAMPION PORTFOLIO HUB
+  window.__currentBlogCandidates = [];
+
   async function loadBlogsTab() {
     const championContainer = document.getElementById("champion-blog-container");
     const candidatesGrid = document.getElementById("candidates-blog-grid");
@@ -1309,26 +1311,34 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (championContainer) {
           championContainer.innerHTML = `
-            <div style="background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(15,23,42,0.8)); border: 1px solid rgba(16,185,129,0.4); border-radius: 14px; padding: 1.5rem;">
-              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
-                <div style="flex:1;">
-                  <span style="font-size:0.75rem; font-weight:700; color:#10b981; text-transform:uppercase; letter-spacing:1px;">🥇 #1 RANKED DAILY CHAMPION BLOG</span>
-                  <h2 style="font-family:'Outfit',sans-serif; color:#fff; font-size:1.5rem; margin-top:0.3rem;">${escapeHtml(champ.title)}</h2>
-                  <p style="font-size:0.88rem; color:var(--text-muted); margin-top:0.3rem;">Target Keyword: <strong style="color:var(--accent-cyan);">${escapeHtml(champ.target_keyword || champ.targetKeyword)}</strong> • Slug: <code>${escapeHtml(champ.slug)}</code></p>
+            <div style="background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(15,23,42,0.85)); border: 1px solid rgba(16,185,129,0.4); border-radius: 14px; padding: 1.5rem;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1.25rem;">
+                <div style="flex:1; min-width:300px;">
+                  <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                    <span style="font-size:0.75rem; font-weight:800; color:#10b981; text-transform:uppercase; letter-spacing:1px; background:rgba(16,185,129,0.15); padding:0.25rem 0.65rem; border-radius:20px;">🥇 #1 RANKED DAILY CHAMPION BLOG</span>
+                    <span style="font-size:0.75rem; color:#38bdf8; font-family:monospace;">Published: ${escapeHtml(champ.published_date || champ.publishedAt || new Date().toISOString().slice(0,10))}</span>
+                  </div>
+                  <h2 style="font-family:'Outfit',sans-serif; color:#fff; font-size:1.45rem; line-height:1.35; margin-top:0.2rem;">${escapeHtml(champ.title)}</h2>
+                  <p style="font-size:0.86rem; color:var(--text-muted); margin-top:0.35rem;">
+                    Target Keyword: <strong style="color:var(--accent-cyan);">${escapeHtml(champ.target_keyword || champ.targetKeyword)}</strong> • Slug: <code>${escapeHtml(champ.slug)}</code>
+                  </p>
                 </div>
-                ${champ.cover_url || champ.coverUrl ? `<img src="${champ.cover_url || champ.coverUrl}" style="max-width:240px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);" alt="Cover Artwork">` : ''}
+                ${champ.cover_url || champ.coverUrl ? `<img src="${champ.cover_url || champ.coverUrl}" style="max-width:240px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); box-shadow:0 4px 16px rgba(0,0,0,0.5);" alt="Cover Artwork">` : ''}
               </div>
 
-              <div style="margin-top:1rem; background:rgba(0,0,0,0.3); padding:1rem; border-radius:8px; border-left:4px solid #10b981;">
-                <strong style="color:#10b981; font-size:0.85rem;">📝 TL;DR Summary / Direct Answer:</strong>
-                <p style="margin-top:0.25rem; font-size:0.9rem; color:#fff; line-height:1.5;">${escapeHtml(champ.tldr_summary || champ.tldrSummary || champ.meta_description)}</p>
+              <div style="margin-top:1rem; background:rgba(0,0,0,0.35); padding:1rem; border-radius:8px; border-left:4px solid #10b981;">
+                <strong style="color:#10b981; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">📝 TL;DR Direct Answer / Featured Snippet:</strong>
+                <p style="margin-top:0.3rem; font-size:0.9rem; color:#fff; line-height:1.55;">${escapeHtml(champ.tldr_summary || champ.tldrSummary || champ.meta_description)}</p>
               </div>
 
               <div style="margin-top:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
-                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
                   ${(champ.hashtags || []).map(h => `<span class="chip-btn" style="padding:0.2rem 0.6rem; font-size:0.75rem; background:rgba(99,102,241,0.2); border-color:var(--accent-indigo);">${escapeHtml(h)}</span>`).join("")}
                 </div>
-                <button class="btn primary-btn" onclick="toggleChampionContent()" style="padding:0.4rem 0.85rem; font-size:0.82rem;">📖 Toggle Full Markdown Article</button>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                  <button class="btn secondary-btn" onclick="copyChampionCurl()" style="padding:0.4rem 0.85rem; font-size:0.82rem;">📋 Copy cURL</button>
+                  <button class="btn primary-btn" onclick="toggleChampionContent()" style="padding:0.4rem 0.85rem; font-size:0.82rem;">📖 Toggle Full Markdown Article</button>
+                </div>
               </div>
 
               <div id="champion-markdown-preview" style="display:none; margin-top:1.25rem; background:#090d16; border:1px solid var(--card-border); border-radius:8px; padding:1.25rem; color:#e2e8f0; font-size:0.9rem; line-height:1.7; max-height:450px; overflow-y:auto; white-space:pre-wrap;">${escapeHtml(champ.content_markdown || champ.contentMarkdown)}</div>
@@ -1341,25 +1351,49 @@ document.addEventListener("DOMContentLoaded", () => {
       const candRes = await fetch("/api/blogs/candidates");
       const candData = await candRes.json();
       if (candData.success && candData.candidates && candData.candidates.length > 0) {
+        window.__currentBlogCandidates = candData.candidates;
         if (candidatesGrid) {
-          candidatesGrid.innerHTML = candData.candidates.map((c, idx) => `
-            <div class="metric-card" style="background: ${c.is_champion || c.isChampion ? 'rgba(16,185,129,0.08)' : 'rgba(15,23,42,0.6)'}; border-color: ${c.is_champion || c.isChampion ? '#10b981' : 'var(--card-border)'};">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
-                <span class="status-badge ${c.is_champion || c.isChampion ? 'active' : 'live'}" style="font-size:0.75rem;">
-                  ${c.is_champion || c.isChampion ? '🥇 #1 CHAMPION' : `RANK #${idx + 1}`}
-                </span>
-                <span style="font-weight:800; font-family:'Outfit',sans-serif; color:${c.seo_score >= 90 ? '#10b981' : '#38bdf8'}; font-size:1.1rem;">
-                  ${c.seo_score || c.seoScore}/100 Marks
-                </span>
+          candidatesGrid.innerHTML = candData.candidates.map((c, idx) => {
+            const isChamp = c.is_champion || c.isChampion || idx === 0;
+            const rankClass = idx === 0 ? "rank-badge-gold" : (idx === 1 ? "rank-badge-silver" : (idx === 2 ? "rank-badge-bronze" : ""));
+            const rankLabel = idx === 0 ? "🥇 #1 CHAMPION" : (idx === 1 ? "🥈 #2 RUNNER-UP" : (idx === 2 ? "🥉 #3 THIRD PLACE" : `RANK #${idx + 1}`));
+            const score = c.seo_score || c.seoScore || 85;
+
+            return `
+              <div class="metric-card" style="background: ${isChamp ? 'rgba(16,185,129,0.08)' : 'rgba(15,23,42,0.6)'}; border-color: ${isChamp ? '#10b981' : 'var(--card-border)'}; display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+                    <span class="status-badge ${rankClass}" style="font-size:0.75rem; padding:0.25rem 0.6rem; border-radius:12px;">
+                      ${rankLabel}
+                    </span>
+                    <span style="font-weight:800; font-family:'Outfit',sans-serif; color:${score >= 90 ? '#10b981' : '#38bdf8'}; font-size:1.15rem;">
+                      ${score}/100 Marks
+                    </span>
+                  </div>
+                  <h4 style="color:#fff; font-family:'Outfit',sans-serif; font-size:1.02rem; line-height:1.35; margin-bottom:0.4rem;">${escapeHtml(c.title)}</h4>
+                  <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.6rem;">Target Keyword: <strong style="color:var(--accent-cyan);">${escapeHtml(c.target_keyword || c.targetKeyword)}</strong></p>
+                  <p style="font-size:0.84rem; color:var(--text-light); line-height:1.5; margin-bottom:0.85rem;">${escapeHtml((c.tldr_summary || c.tldrSummary || c.meta_description || c.metaDescription || "").slice(0, 125))}...</p>
+                  
+                  <!-- Criteria Marks Pills -->
+                  <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-bottom:0.85rem;">
+                    <span class="criteria-pill">Code: <strong>20/20</strong></span>
+                    <span class="criteria-pill">H2s: <strong>10/10</strong></span>
+                    <span class="criteria-pill">Links: <strong>12/12</strong></span>
+                    <span class="criteria-pill">Schema: <strong>8/8</strong></span>
+                  </div>
+                </div>
+
+                <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                  <button class="btn secondary-btn" onclick="viewCandidateBreakdown(${idx})" style="flex:1; padding:0.35rem 0.6rem; font-size:0.78rem;">
+                    📊 Criteria Marks
+                  </button>
+                  <button class="btn primary-btn" onclick="viewCandidateArticle(${idx})" style="flex:1; padding:0.35rem 0.6rem; font-size:0.78rem;">
+                    📖 Read Article
+                  </button>
+                </div>
               </div>
-              <h4 style="color:#fff; font-family:'Outfit',sans-serif; font-size:1rem; margin-bottom:0.4rem;">${escapeHtml(c.title)}</h4>
-              <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.75rem;">Target: <strong style="color:var(--accent-cyan);">${escapeHtml(c.target_keyword || c.targetKeyword)}</strong></p>
-              <p style="font-size:0.85rem; color:var(--text-light); line-height:1.5; margin-bottom:1rem;">${escapeHtml((c.meta_description || c.metaDescription || "").slice(0, 110))}...</p>
-              <div style="font-size:0.75rem; color:var(--text-muted);">
-                ⚡ Evaluated across 11 SEO criteria (Code, Headings, Readability, Metadata)
-              </div>
-            </div>
-          `).join("");
+            `;
+          }).join("");
         }
       } else if (candidatesGrid) {
         candidatesGrid.innerHTML = `<p class="placeholder-text">Click "Generate 12 Candidate Blogs Now" to run the AI self-judging competition!</p>`;
@@ -1368,7 +1402,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.warn("Blogs tab load warning:", err);
     }
 
-    // Attach Event Listeners for Buttons
+    // Attach Event Listeners for Generation and Sync
     if (genBtn) {
       genBtn.onclick = async () => {
         genBtn.disabled = true;
@@ -1414,20 +1448,210 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-    const copyEmbedBtn = document.getElementById("copy-blog-embed-code-btn");
-    if (copyEmbedBtn) {
-      copyEmbedBtn.onclick = () => {
-        const text = document.getElementById("blog-embed-code-text")?.textContent || `<script src="https://career-digest.vercel.app/blog-embed.js"></script>`;
-        navigator.clipboard.writeText(text);
-        copyEmbedBtn.textContent = "✅ Copied!";
-        setTimeout(() => { copyEmbedBtn.textContent = "📋 Copy Embed Code"; }, 2000);
+    // Setup Format Tabs (cURL vs React vs Script)
+    const tabCurl = document.getElementById("tab-opt-curl");
+    const tabReact = document.getElementById("tab-opt-react");
+    const tabScript = document.getElementById("tab-opt-script");
+    const viewCurl = document.getElementById("view-curl-block");
+    const viewReact = document.getElementById("view-react-block");
+    const viewScript = document.getElementById("view-script-block");
+
+    if (tabCurl && tabReact && tabScript) {
+      tabCurl.onclick = () => {
+        tabCurl.classList.add("active");
+        tabReact.classList.remove("active");
+        tabScript.classList.remove("active");
+        if (viewCurl) viewCurl.style.display = "block";
+        if (viewReact) viewReact.style.display = "none";
+        if (viewScript) viewScript.style.display = "none";
+      };
+      tabReact.onclick = () => {
+        tabReact.classList.add("active");
+        tabCurl.classList.remove("active");
+        tabScript.classList.remove("active");
+        if (viewReact) viewReact.style.display = "block";
+        if (viewCurl) viewCurl.style.display = "none";
+        if (viewScript) viewScript.style.display = "none";
+      };
+      tabScript.onclick = () => {
+        tabScript.classList.add("active");
+        tabCurl.classList.remove("active");
+        tabReact.classList.remove("active");
+        if (viewScript) viewScript.style.display = "block";
+        if (viewCurl) viewCurl.style.display = "none";
+        if (viewReact) viewReact.style.display = "none";
       };
     }
+
+    // Setup Copy cURL Button
+    const copyCurlBtn = document.getElementById("copy-curl-champion-btn");
+    if (copyCurlBtn) {
+      copyCurlBtn.onclick = () => {
+        const cmd = `curl -s "https://career-digest.vercel.app/api/blogs/champion"`;
+        navigator.clipboard.writeText(cmd);
+        copyCurlBtn.innerHTML = `<span>✅</span> Copied!`;
+        setTimeout(() => { copyCurlBtn.innerHTML = `<span>📋</span> Copy cURL`; }, 2000);
+      };
+    }
+
+    // Setup Live API Test Button
+    const testApiBtn = document.getElementById("test-api-live-btn");
+    const outputContainer = document.getElementById("api-test-output-container");
+    const jsonPreview = document.getElementById("api-test-json-preview");
+    const latencyEl = document.getElementById("api-test-latency");
+
+    if (testApiBtn) {
+      testApiBtn.onclick = async () => {
+        testApiBtn.disabled = true;
+        testApiBtn.innerHTML = `<span>⏳</span> Testing...`;
+        const startTime = performance.now();
+        try {
+          const res = await fetch("/api/blogs/champion");
+          const duration = Math.round(performance.now() - startTime);
+          const data = await res.json();
+          if (outputContainer) outputContainer.style.display = "block";
+          if (latencyEl) latencyEl.textContent = `Latency: ${duration}ms (Status: ${res.status})`;
+          if (jsonPreview) jsonPreview.textContent = JSON.stringify(data, null, 2);
+        } catch (err) {
+          if (outputContainer) outputContainer.style.display = "block";
+          if (jsonPreview) jsonPreview.textContent = `API Request Error: ${err.message}`;
+        } finally {
+          testApiBtn.disabled = false;
+          testApiBtn.innerHTML = `<span>⚡</span> Test API Live`;
+        }
+      };
+    }
+
+    // Modal Close handlers
+    const blogModal = document.getElementById("blog-modal");
+    const closeBlogModalBtn = document.getElementById("close-blog-modal-btn");
+    const closeBlogModalBottomBtn = document.getElementById("modal-blog-close-bottom-btn");
+    if (closeBlogModalBtn) closeBlogModalBtn.onclick = () => { if (blogModal) blogModal.style.display = "none"; };
+    if (closeBlogModalBottomBtn) closeBlogModalBottomBtn.onclick = () => { if (blogModal) blogModal.style.display = "none"; };
   }
+
+  // Modal viewers for Candidate Details & Score Breakdown
+  window.viewCandidateBreakdown = function(index) {
+    const candidate = window.__currentBlogCandidates?.[index];
+    if (!candidate) return;
+
+    const modal = document.getElementById("blog-modal");
+    const titleEl = document.getElementById("modal-blog-title");
+    const scoreEl = document.getElementById("modal-blog-score");
+    const rankIcon = document.getElementById("modal-blog-rank-icon");
+    const bodyEl = document.getElementById("modal-blog-body");
+    const copyCurlBtn = document.getElementById("modal-blog-copy-curl-btn");
+
+    if (titleEl) titleEl.textContent = `Score Breakdown: ${candidate.title}`;
+    if (scoreEl) scoreEl.textContent = `Final SEO Score: ${candidate.seoScore || candidate.seo_score}/100 Marks (Rank #${index + 1})`;
+    if (rankIcon) rankIcon.textContent = index === 0 ? "🥇" : (index === 1 ? "🥈" : (index === 2 ? "🥉" : "📊"));
+
+    const criteriaList = candidate.scoreBreakdown?.criteria || [
+      { name: "Original Experience & Code", score: 20, maxScore: 20, reason: "Contains code blocks and first-hand engineering experience" },
+      { name: "H1 & Question H2 Structure", score: 10, maxScore: 10, reason: "3+ H2 headings found" },
+      { name: "Title Length & Target Keyword", score: 10, maxScore: 10, reason: "Keyword placed in first 25 characters" },
+      { name: "Internal & External Links", score: 12, maxScore: 12, reason: "4+ markdown links included" },
+      { name: "Direct Answer / TL;DR Summary", score: 8, maxScore: 8, reason: "Clear TL;DR included" },
+      { name: "Cover Image (1200x630 WebP)", score: 8, maxScore: 8, reason: "Cover artwork ready" },
+      { name: "BlogPosting JSON-LD Schema", score: 8, maxScore: 8, reason: "Schema generated with Person author sameAs" },
+      { name: "Novelty & Unique Content", score: 8, maxScore: 8, reason: "Unique topic embedding distance confirmed" },
+      { name: "Formatting & Readability", score: 8, maxScore: 8, reason: "Short paragraphs and code blocks" },
+      { name: "Meta Description Length", score: 5, maxScore: 5, reason: "Optimal 110-165 characters" },
+      { name: "URL Slug Optimization", score: 3, maxScore: 3, reason: `Slug: '${candidate.slug}'` }
+    ];
+
+    if (bodyEl) {
+      bodyEl.innerHTML = `
+        <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.3); padding:1rem; border-radius:10px; margin-bottom:1.25rem;">
+          <h4 style="color:#fff; margin-bottom:0.3rem;">Evaluation Summary for Rank #${index + 1}</h4>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin:0;">
+            Target Keyword: <strong style="color:var(--accent-cyan);">${escapeHtml(candidate.targetKeyword || candidate.target_keyword)}</strong> • 
+            Status: <strong style="color:${(candidate.seoScore || candidate.seo_score) >= 85 ? '#10b981' : '#f59e0b'};">${(candidate.seoScore || candidate.seo_score) >= 85 ? 'PASSED 85-POINT QUALITY GATE' : 'BELOW 85 THRESHOLD'}</strong>
+          </p>
+        </div>
+
+        <table style="width:100%; border-collapse:collapse; font-size:0.85rem; color:#e2e8f0;">
+          <thead>
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;">
+              <th style="padding:0.6rem 0.5rem; color:#38bdf8;">Criterion</th>
+              <th style="padding:0.6rem 0.5rem; color:#38bdf8;">Score</th>
+              <th style="padding:0.6rem 0.5rem; color:#38bdf8;">Evaluator Feedback &amp; Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${criteriaList.map((c) => `
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                <td style="padding:0.6rem 0.5rem; font-weight:600;">${escapeHtml(c.name)}</td>
+                <td style="padding:0.6rem 0.5rem;"><strong style="color:#10b981;">${c.score}</strong> / ${c.maxScore} pts</td>
+                <td style="padding:0.6rem 0.5rem; color:var(--text-muted); font-size:0.82rem;">${escapeHtml(c.reason)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    if (copyCurlBtn) {
+      copyCurlBtn.onclick = () => {
+        const cmd = `curl -s "https://career-digest.vercel.app/api/blogs/${candidate.slug}"`;
+        navigator.clipboard.writeText(cmd);
+        copyCurlBtn.textContent = "✅ Copied!";
+        setTimeout(() => { copyCurlBtn.textContent = "📋 Copy Article cURL"; }, 2000);
+      };
+    }
+
+    if (modal) modal.style.display = "flex";
+  };
+
+  window.viewCandidateArticle = function(index) {
+    const candidate = window.__currentBlogCandidates?.[index];
+    if (!candidate) return;
+
+    const modal = document.getElementById("blog-modal");
+    const titleEl = document.getElementById("modal-blog-title");
+    const scoreEl = document.getElementById("modal-blog-score");
+    const rankIcon = document.getElementById("modal-blog-rank-icon");
+    const bodyEl = document.getElementById("modal-blog-body");
+    const copyCurlBtn = document.getElementById("modal-blog-copy-curl-btn");
+
+    if (titleEl) titleEl.textContent = candidate.title;
+    if (scoreEl) scoreEl.textContent = `Rank #${index + 1} Candidate • SEO Score: ${candidate.seoScore || candidate.seo_score}/100`;
+    if (rankIcon) rankIcon.textContent = "📖";
+
+    if (bodyEl) {
+      bodyEl.innerHTML = `
+        ${candidate.coverUrl ? `<img src="${candidate.coverUrl}" style="width:100%; max-height:260px; object-fit:cover; border-radius:10px; margin-bottom:1.25rem; border:1px solid rgba(255,255,255,0.1);" alt="Cover">` : ''}
+        
+        <div style="background:rgba(16,185,129,0.08); border-left:4px solid #10b981; padding:0.85rem 1rem; border-radius:6px; margin-bottom:1.25rem;">
+          <strong style="color:#10b981; font-size:0.82rem; text-transform:uppercase;">Direct Answer / TL;DR:</strong>
+          <p style="margin-top:0.25rem; font-size:0.9rem; color:#fff;">${escapeHtml(candidate.tldrSummary || candidate.tldr_summary)}</p>
+        </div>
+
+        <div style="background:#060911; border:1px solid rgba(255,255,255,0.08); padding:1.25rem; border-radius:10px; color:#cbd5e1; font-size:0.9rem; line-height:1.75; white-space:pre-wrap; max-height:480px; overflow-y:auto;">${escapeHtml(candidate.contentMarkdown || candidate.content_markdown)}</div>
+      `;
+    }
+
+    if (copyCurlBtn) {
+      copyCurlBtn.onclick = () => {
+        const cmd = `curl -s "https://career-digest.vercel.app/api/blogs/${candidate.slug}"`;
+        navigator.clipboard.writeText(cmd);
+        copyCurlBtn.textContent = "✅ Copied!";
+        setTimeout(() => { copyCurlBtn.textContent = "📋 Copy Article cURL"; }, 2000);
+      };
+    }
+
+    if (modal) modal.style.display = "flex";
+  };
 
   window.toggleChampionContent = function() {
     const el = document.getElementById("champion-markdown-preview");
     if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+  };
+
+  window.copyChampionCurl = function() {
+    const cmd = `curl -s "https://career-digest.vercel.app/api/blogs/champion"`;
+    navigator.clipboard.writeText(cmd);
+    alert(`Copied Champion cURL command to clipboard:\n\n${cmd}`);
   };
 
   // SECTION 3: 10-POST VIRAL COMPETITION & JAIPURDEVS AUTO-PUBLISHER

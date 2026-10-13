@@ -30,4 +30,4 @@ RUN npm ci --only=production
 COPY --from=builder /app/dist ./dist
 
 # Run index.js on container startup
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/src/index.js"]

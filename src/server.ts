@@ -49,6 +49,9 @@ import {
   generate12BlogCandidatesWorkflow,
   fetchLatestChampionBlog,
   fetchAllBlogCandidates,
+  fetchBlogBySlug,
+  fetchPublishedBlogsArchive,
+  get11CriteriaAlgorithmRubric,
 } from "./llm/dailyBlogEngine.js";
 import {
   generate10ViralPostsWorkflow,
@@ -67,11 +70,11 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 150
 
 app.use(express.json());
 
-// Enable CORS for SEO Sync API endpoints (allows https://www.abhishektiwari.online to fetch SEO data directly)
-app.use("/api/seo/sync", (req, res, next) => {
+// Enable CORS globally for all /api endpoints (allows https://www.abhishektiwari.online to fetch blogs, SEO, and stats directly)
+app.use("/api", (req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-second-brain-secret");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-second-brain-secret, Accept");
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -950,6 +953,38 @@ app.all("/api/cron/daily", async (req, res) => {
   }
 });
 
+// GET /api/blogs - Retrieve published blogs archive for https://www.abhishektiwari.online/
+app.get("/api/blogs", async (req, res) => {
+  try {
+    const archive = await fetchPublishedBlogsArchive();
+    const champion = await fetchLatestChampionBlog();
+    res.json({
+      success: true,
+      targetPortfolio: "https://www.abhishektiwari.online/",
+      champion,
+      count: archive.length,
+      blogs: archive,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/blogs/algorithm - Retrieve 11-Criteria AI SEO Quality Gate Algorithm Rubric & Formula
+app.get("/api/blogs/algorithm", (req, res) => {
+  try {
+    const rubric = get11CriteriaAlgorithmRubric();
+    res.json({
+      success: true,
+      name: "11-Criteria AI SEO Quality Gate Algorithm",
+      evaluator: "Self-Judging Multi-Factor Evaluator (0–100 Marks)",
+      ...rubric,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/blogs/champion - Retrieve the #1 Ranked Daily Champion Blog (Used by https://www.abhishektiwari.online/)
 app.get("/api/blogs/champion", async (req, res) => {
   try {
@@ -974,6 +1009,24 @@ app.get("/api/blogs/candidates", async (req, res) => {
       date,
       count: candidates.length,
       candidates,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/blogs/:slug - Retrieve a specific blog post by URL slug
+app.get("/api/blogs/:slug", async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const blog = await fetchBlogBySlug(slug);
+    if (!blog) {
+      return res.status(404).json({ success: false, error: `Blog not found for slug: ${slug}` });
+    }
+    res.json({
+      success: true,
+      targetPortfolio: "https://www.abhishektiwari.online/",
+      blog,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

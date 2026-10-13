@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p .",
-    "start": "node dist/server.js",
-    "start:daemon": "node dist/index.js --daemon",
+    "start": "node dist/src/server.js",
+    "start:daemon": "node dist/src/index.js --daemon",
     "dev": "tsx src/server.ts",
     "cli": "tsx src/index.ts",
     "daemon": "tsx src/index.ts --daemon",
