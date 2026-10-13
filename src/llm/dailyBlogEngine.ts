@@ -468,6 +468,7 @@ export const DEFAULT_TECHNICAL_TOPICS = [
 // In-Memory and File Cache for Zero Downtime & Instant Response
 let memoryCandidates: EvaluatedBlogCandidate[] = [];
 let memoryChampion: EvaluatedBlogCandidate | null = null;
+let memoryWinnersArchive: EvaluatedBlogCandidate[] = [];
 
 function getCacheFilePath(): string {
   try {
@@ -490,6 +491,11 @@ function loadCacheFromDisk(): boolean {
       if (parsed?.candidates?.length > 0) {
         memoryCandidates = parsed.candidates;
         memoryChampion = parsed.champion || parsed.candidates[0];
+        if (Array.isArray(parsed.savedWinnersArchive) && parsed.savedWinnersArchive.length > 0) {
+          memoryWinnersArchive = parsed.savedWinnersArchive;
+        } else if (memoryChampion) {
+          memoryWinnersArchive = [memoryChampion];
+        }
         return true;
       }
     }
@@ -502,7 +508,32 @@ function loadCacheFromDisk(): boolean {
 function saveCacheToDisk(candidates: EvaluatedBlogCandidate[], champion: EvaluatedBlogCandidate) {
   try {
     const filePath = getCacheFilePath();
-    fs.writeFileSync(filePath, JSON.stringify({ candidates, champion, updatedAt: new Date().toISOString() }, null, 2), "utf-8");
+    // Maintain winners archive (upsert today's champion by slug or publish date)
+    if (champion) {
+      const existingIdx = memoryWinnersArchive.findIndex(
+        (w) => w.slug === champion.slug || w.publishedAt === champion.publishedAt
+      );
+      if (existingIdx >= 0) {
+        memoryWinnersArchive[existingIdx] = champion;
+      } else {
+        memoryWinnersArchive.unshift(champion);
+      }
+    }
+
+    fs.writeFileSync(
+      filePath,
+      JSON.stringify(
+        {
+          candidates,
+          champion,
+          savedWinnersArchive: memoryWinnersArchive,
+          updatedAt: new Date().toISOString(),
+        },
+        null,
+        2
+      ),
+      "utf-8"
+    );
   } catch (err: any) {
     console.warn("[dailyBlogEngine] Disk cache write notice:", err.message);
   }
@@ -1035,47 +1066,29 @@ export async function saveDaily12BlogCandidates(
 ) {
   const today = new Date().toISOString().slice(0, 10);
   try {
-    const candidateRows = candidates.map((c) => ({
-      run_date: today,
-      candidate_index: c.candidateIndex,
-      topic: c.topic,
-      target_keyword: c.targetKeyword,
-      title: c.title,
-      slug: c.slug,
-      meta_description: c.metaDescription,
-      tldr_summary: c.tldrSummary,
-      content_markdown: c.contentMarkdown,
-      json_ld_schema: c.jsonLdSchema,
-      cover_url: c.coverUrl,
-      cover_alt: c.coverAlt,
-      hashtags: c.hashtags,
-      seo_score: c.seoScore,
-      is_champion: c.isChampion,
-      score_breakdown: c.scoreBreakdown
-    }));
+    // Only save the WINNER (Champion Blog) to database per user requirement
+    await supabase.from("daily_champion_blogs").upsert(
+      {
+        publish_date: today,
+        title: champion.title,
+        slug: champion.slug,
+        target_keyword: champion.targetKeyword,
+        meta_description: champion.metaDescription,
+        tldr_summary: champion.tldrSummary,
+        content_markdown: champion.contentMarkdown,
+        json_ld_schema: champion.jsonLdSchema,
+        cover_url: champion.coverUrl,
+        cover_alt: champion.coverAlt,
+        hashtags: champion.hashtags,
+        seo_score: champion.seoScore,
+        synced_to_portfolio: true,
+      },
+      { onConflict: "publish_date" }
+    );
 
-    await supabase.from("daily_blog_candidates").delete().eq("run_date", today);
-    await supabase.from("daily_blog_candidates").insert(candidateRows);
-
-    await supabase.from("daily_champion_blogs").upsert({
-      publish_date: today,
-      title: champion.title,
-      slug: champion.slug,
-      target_keyword: champion.targetKeyword,
-      meta_description: champion.metaDescription,
-      tldr_summary: champion.tldrSummary,
-      content_markdown: champion.contentMarkdown,
-      json_ld_schema: champion.jsonLdSchema,
-      cover_url: champion.coverUrl,
-      cover_alt: champion.coverAlt,
-      hashtags: champion.hashtags,
-      seo_score: champion.seoScore,
-      synced_to_portfolio: true
-    }, { onConflict: "publish_date" });
-
-    console.log(`[dailyBlogEngine] Successfully persisted 12 candidates & Champion blog to Supabase!`);
+    console.log(`[dailyBlogEngine] Successfully persisted WINNER Champion blog to database: "${champion.title}" (Non-winning candidates excluded per policy)`);
   } catch (err: any) {
-    console.warn(`[dailyBlogEngine] Supabase storage notice (using local cache fallback):`, err.message);
+    console.warn(`[dailyBlogEngine] Supabase storage notice (using local disk cache fallback):`, err.message);
   }
 }
 
@@ -1144,41 +1157,7 @@ export async function fetchAllBlogCandidates(runDate?: string): Promise<Evaluate
     return memoryCandidates;
   }
 
-  // 3. Check Supabase
-  const targetDate = runDate || new Date().toISOString().slice(0, 10);
-  try {
-    const { data } = await supabase
-      .from("daily_blog_candidates")
-      .select("*")
-      .eq("run_date", targetDate)
-      .order("seo_score", { ascending: false });
-
-    if (data && data.length > 0) {
-      memoryCandidates = data.map((d: any, idx: number) => ({
-        candidateIndex: d.candidate_index || idx + 1,
-        topic: d.topic || d.title,
-        targetKeyword: d.target_keyword,
-        title: d.title,
-        slug: d.slug,
-        metaDescription: d.meta_description,
-        tldrSummary: d.tldr_summary,
-        contentMarkdown: d.content_markdown,
-        jsonLdSchema: d.json_ld_schema,
-        coverUrl: d.cover_url,
-        coverAlt: d.cover_alt,
-        hashtags: d.hashtags || [],
-        seoScore: d.seo_score,
-        isChampion: d.is_champion,
-        scoreBreakdown: d.score_breakdown || { totalScore: d.seo_score, passed: d.seo_score >= 85, criteria: [] }
-      }));
-      memoryChampion = memoryCandidates.find(c => c.isChampion) || memoryCandidates[0];
-      return memoryCandidates;
-    }
-  } catch {
-    // fallback
-  }
-
-  // 4. Generate initial high quality seed candidates
+  // 3. Generate initial high quality seed candidates
   const seeds = generateInitialSeedCandidates();
   memoryCandidates = seeds;
   memoryChampion = seeds[0];
@@ -1187,10 +1166,28 @@ export async function fetchAllBlogCandidates(runDate?: string): Promise<Evaluate
 }
 
 export async function fetchBlogBySlug(slug: string): Promise<EvaluatedBlogCandidate | null> {
-  const all = await fetchAllBlogCandidates();
-  const match = all.find((b) => b.slug.toLowerCase() === slug.toLowerCase());
-  if (match) return match;
+  const normalizedSlug = slug.toLowerCase();
 
+  // 1. Check in-memory champion
+  if (memoryChampion && memoryChampion.slug.toLowerCase() === normalizedSlug) {
+    return memoryChampion;
+  }
+
+  // 2. Check memory winners archive
+  const archiveMatch = memoryWinnersArchive.find((b) => b.slug.toLowerCase() === normalizedSlug);
+  if (archiveMatch) return archiveMatch;
+
+  // 3. Check memory candidates
+  const candidateMatch = memoryCandidates.find((b) => b.slug.toLowerCase() === normalizedSlug);
+  if (candidateMatch) return candidateMatch;
+
+  // 4. Check disk cache
+  loadCacheFromDisk();
+  const diskMatch = memoryWinnersArchive.find((b) => b.slug.toLowerCase() === normalizedSlug) ||
+    memoryCandidates.find((b) => b.slug.toLowerCase() === normalizedSlug);
+  if (diskMatch) return diskMatch;
+
+  // 5. Query Supabase daily_champion_blogs
   try {
     const { data } = await supabase
       .from("daily_champion_blogs")
@@ -1235,11 +1232,57 @@ export async function fetchPublishedBlogsArchive(): Promise<Array<{
   seoScore: number;
   publishedAt: string;
   url: string;
+  contentMarkdown?: string;
+  hashtags?: string[];
 }>> {
-  const champion = await fetchLatestChampionBlog();
-  const candidates = await fetchAllBlogCandidates();
+  // 1. Attempt to fetch all stored winners from Supabase
+  try {
+    const { data } = await supabase
+      .from("daily_champion_blogs")
+      .select("*")
+      .order("publish_date", { ascending: false });
 
-  const archive = candidates.slice(0, 6).map((c) => ({
+    if (data && data.length > 0) {
+      return data.map((d: any) => ({
+        title: d.title,
+        slug: d.slug,
+        targetKeyword: d.target_keyword || "Technical Deep Dive",
+        metaDescription: d.meta_description || "",
+        tldrSummary: d.tldr_summary || "",
+        coverUrl: d.cover_url || "https://www.abhishektiwari.online/og.png",
+        seoScore: d.seo_score || 95,
+        publishedAt: d.publish_date,
+        url: `https://www.abhishektiwari.online/blog/${d.slug}`,
+        contentMarkdown: d.content_markdown,
+        hashtags: d.hashtags || ["#Engineering", "#Tech"]
+      }));
+    }
+  } catch {
+    // continue to local fallback
+  }
+
+  // 2. Local fallback from winners archive and champion
+  loadCacheFromDisk();
+  const champion = await fetchLatestChampionBlog();
+
+  // Combine memoryWinnersArchive with champion and top seeds
+  const combined = [...memoryWinnersArchive];
+  if (champion && !combined.some((b) => b.slug === champion.slug)) {
+    combined.unshift(champion);
+  }
+
+  // If archive still has fewer than 3, add high-quality seeds as historical posts
+  if (combined.length < 3) {
+    const seeds = generateInitialSeedCandidates();
+    for (const seed of seeds) {
+      if (!combined.some((b) => b.slug === seed.slug)) {
+        combined.push(seed);
+      }
+      if (combined.length >= 6) break;
+    }
+  }
+
+  return combined.map((c) => ({
     title: c.title,
     slug: c.slug,
     targetKeyword: c.targetKeyword,
@@ -1248,10 +1291,10 @@ export async function fetchPublishedBlogsArchive(): Promise<Array<{
     coverUrl: c.coverUrl,
     seoScore: c.seoScore,
     publishedAt: c.publishedAt || new Date().toISOString().slice(0, 10),
-    url: `https://www.abhishektiwari.online/blog/${c.slug}`
+    url: `https://www.abhishektiwari.online/blog/${c.slug}`,
+    contentMarkdown: c.contentMarkdown,
+    hashtags: c.hashtags,
   }));
-
-  return archive;
 }
 
 
