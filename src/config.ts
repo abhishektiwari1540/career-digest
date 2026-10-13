@@ -28,7 +28,7 @@ export const config = {
   },
   groq: {
     apiKey: process.env.GROQ_API_KEY ?? "",
-    model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
+    model: process.env.GROQ_MODEL ?? "openai/gpt-oss-120b",
   },
   openRouter: {
     apiKey: process.env.OPENROUTER_API_KEY ?? "",
@@ -57,6 +57,7 @@ export const config = {
   candidateName: process.env.CANDIDATE_NAME ?? "Abhishek Tiwari",
   candidateLocation: process.env.CANDIDATE_LOCATION ?? "Jaipur, Rajasthan, India",
   githubUsername: process.env.GITHUB_USERNAME ?? "",
+  githubToken: process.env.GITHUB_TOKEN ?? "",
   leetcodeUsername: process.env.LEETCODE_USERNAME ?? "",
   stackoverflowUserId: process.env.STACKOVERFLOW_USER_ID ?? "",
   youtubeApiKey: process.env.YOUTUBE_API_KEY || process.env.YT_KEY || "",

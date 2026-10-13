@@ -34,6 +34,8 @@ document.addEventListener("DOMContentLoaded", () => {
         loadSkillRoadmapAndPlatforms();
       } else if (targetTab === "tab-blogs") {
         loadBlogsTab();
+      } else if (targetTab === "tab-opensource") {
+        loadOpenSourceTab();
       }
     });
   });
@@ -1714,6 +1716,365 @@ document.addEventListener("DOMContentLoaded", () => {
           if (viralStatus) viralStatus.style.display = "none";
           viralBtn.innerHTML = `<span>⚡</span> Generate 10 Posts & Auto-Publish Winner Now`;
         }
+      };
+    }
+  }
+
+  // ==========================================
+  // TAB 7: OPEN-SOURCE AI CONTRIBUTION HUB
+  // ==========================================
+  let cachedOpenSourceData = null;
+  let activeOsCategory = "all";
+  let osSearchTerm = "";
+
+  async function loadOpenSourceTab(forceRefresh = false) {
+    const container = document.getElementById("os-repos-container");
+    const statRepos = document.getElementById("os-stat-repos");
+    const statIssues = document.getElementById("os-stat-issues");
+    const statImpact = document.getElementById("os-stat-impact");
+    const statPatches = document.getElementById("os-stat-patches");
+
+    if (!container) return;
+
+    if (!cachedOpenSourceData || forceRefresh) {
+      container.innerHTML = `<div style="text-align:center; padding:3rem 1rem;">
+        <div style="font-size:2.5rem; animation:spin 1s linear infinite; display:inline-block;">⚡</div>
+        <h4 style="color:#fff; margin-top:1rem; font-family:'Outfit',sans-serif;">Scanning Tier-1 Repositories & Running Gemini Solvers...</h4>
+        <p style="color:var(--text-muted); font-size:0.88rem; max-width:450px; margin:0.5rem auto;">Reading open issues, evaluating root causes, and generating production-ready code patches for Abhishek Tiwari's stack.</p>
+      </div>`;
+
+      try {
+        const url = forceRefresh ? "/api/opensource/refresh" : "/api/opensource";
+        const method = forceRefresh ? "POST" : "GET";
+        const res = await fetch(url, { method });
+        const data = await res.json();
+
+        if (data.success && data.digest) {
+          cachedOpenSourceData = data.digest;
+        } else if (data.repositories) {
+          cachedOpenSourceData = data;
+        } else {
+          throw new Error(data.error || "Failed to load open-source intelligence.");
+        }
+      } catch (err) {
+        container.innerHTML = `<div class="error-banner" style="padding:1.5rem; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:10px; color:#f87171;">
+          <strong>Error loading open-source digest:</strong> ${escapeHtml(err.message)}
+          <br/><button class="btn secondary-btn" onclick="loadOpenSourceTab(true)" style="margin-top:0.75rem;">Retry Scan</button>
+        </div>`;
+        return;
+      }
+    }
+
+    // Update stats bar
+    if (cachedOpenSourceData) {
+      if (statRepos) statRepos.textContent = cachedOpenSourceData.totalRepositories || cachedOpenSourceData.repositories?.length || 10;
+      if (statIssues) statIssues.textContent = cachedOpenSourceData.totalIssuesAnalyzed || "--";
+      if (statImpact) statImpact.textContent = `${cachedOpenSourceData.avgImpactScore || 94}/100`;
+      if (statPatches) statPatches.textContent = "100% Ready";
+    }
+
+    renderFilteredOpenSourceRepos();
+    initOpenSourceEventListeners();
+  }
+
+  function renderFilteredOpenSourceRepos() {
+    const container = document.getElementById("os-repos-container");
+    if (!container || !cachedOpenSourceData) return;
+
+    let repos = cachedOpenSourceData.repositories || [];
+
+    // Filter by Category
+    if (activeOsCategory !== "all") {
+      repos = repos.filter((r) => r.category === activeOsCategory);
+    }
+
+    // Filter by Search Query
+    if (osSearchTerm.trim()) {
+      const q = osSearchTerm.toLowerCase();
+      repos = repos.filter(
+        (r) =>
+          r.fullName.toLowerCase().includes(q) ||
+          r.primaryLanguage.toLowerCase().includes(q) ||
+          r.description.toLowerCase().includes(q) ||
+          r.issues.some((iss) => iss.title.toLowerCase().includes(q))
+      );
+    }
+
+    if (repos.length === 0) {
+      container.innerHTML = `<div style="text-align:center; padding:3rem; color:var(--text-muted);">
+        <p>No repositories match the filter <code>${escapeHtml(activeOsCategory)}</code> / <code>"${escapeHtml(osSearchTerm)}"</code>.</p>
+        <button class="btn secondary-btn" style="margin-top:0.5rem;" id="os-clear-filters-btn">Reset Filters</button>
+      </div>`;
+      const clearBtn = document.getElementById("os-clear-filters-btn");
+      if (clearBtn) {
+        clearBtn.onclick = () => {
+          activeOsCategory = "all";
+          osSearchTerm = "";
+          const searchInput = document.getElementById("os-search-input");
+          if (searchInput) searchInput.value = "";
+          document.querySelectorAll("#os-category-filters .chip-btn").forEach((c) => c.classList.toggle("active", c.dataset.filter === "all"));
+          renderFilteredOpenSourceRepos();
+        };
+      }
+      return;
+    }
+
+    container.innerHTML = repos
+      .map((r, rIdx) => {
+        const issuesHtml = (r.issues || [])
+          .map((iss) => {
+            const analysis = iss.analysis || {};
+            const diffClass =
+              analysis.difficulty === "Beginner"
+                ? "diff-pill-beginner"
+                : analysis.difficulty === "Advanced"
+                ? "diff-pill-advanced"
+                : "diff-pill-intermediate";
+
+            return `
+            <div class="os-issue-item">
+              <div class="os-issue-info">
+                <div class="os-issue-title">
+                  <a href="${escapeAttr(iss.url)}" target="_blank" style="color:#fff; text-decoration:none;">
+                    #${iss.number} · ${escapeHtml(iss.title)}
+                  </a>
+                </div>
+                <div class="os-issue-labels">
+                  <span class="os-label-chip ${diffClass}">${escapeHtml(analysis.difficulty || "Intermediate")}</span>
+                  <span class="os-label-chip os-impact-pill">Impact: ${analysis.impactScore || 92}/100</span>
+                  <span class="os-label-chip">⏱️ ${escapeHtml(analysis.estimatedHours || "2-3 hrs")}</span>
+                  ${(iss.labels || []).map((l) => `<span class="os-label-chip">${escapeHtml(l)}</span>`).join("")}
+                </div>
+              </div>
+              <button class="btn primary-btn view-os-solution-btn" data-repo-id="${escapeAttr(r.id)}" data-issue-num="${iss.number}" style="padding:0.45rem 0.9rem; font-size:0.78rem; font-weight:700; display:flex; align-items:center; gap:0.4rem; background:linear-gradient(135deg, #06b6d4, #0891b2);">
+                <span>⚡</span> View AI Diagnosis &amp; Code Patch
+              </button>
+            </div>`;
+          })
+          .join("");
+
+        return `
+        <div class="os-repo-card">
+          <div class="os-repo-head">
+            <div class="os-repo-title">
+              <span style="font-size:1.3rem;">📦</span>
+              <a href="${escapeAttr(r.url)}" target="_blank">${escapeHtml(r.fullName)}</a>
+              <span class="os-metric-badge os-tag-category">${escapeHtml(r.category)}</span>
+            </div>
+            <div class="os-metrics-pills">
+              <span class="os-metric-badge">⭐ ${Number(r.stars || 0).toLocaleString()}</span>
+              <span class="os-metric-badge">🍴 ${Number(r.forks || 0).toLocaleString()}</span>
+              <span class="os-metric-badge" style="color:#38bdf8; font-weight:600;">${escapeHtml(r.primaryLanguage)}</span>
+            </div>
+          </div>
+          <p style="color:var(--text-muted); font-size:0.88rem; line-height:1.5;">${escapeHtml(r.description)}</p>
+          <div class="os-fit-box">
+            <strong>🎯 Why This Fits Abhishek:</strong> ${escapeHtml(r.whyFitsProfile)}
+          </div>
+          <div style="margin-top:1rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+              <span style="font-size:0.78rem; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-muted); font-weight:700;">Analyzed Open Issues (${(r.issues || []).length})</span>
+              <a href="${escapeAttr(r.url)}/issues" target="_blank" style="font-size:0.75rem; color:#38bdf8; text-decoration:none;">All GitHub Issues ↗</a>
+            </div>
+            <div class="os-issues-list">
+              ${issuesHtml}
+            </div>
+          </div>
+        </div>`;
+      })
+      .join("");
+
+    // Attach click listeners to all solution buttons
+    document.querySelectorAll(".view-os-solution-btn").forEach((btn) => {
+      btn.onclick = () => {
+        const repoId = btn.dataset.repoId;
+        const issueNum = parseInt(btn.dataset.issueNum, 10);
+        openOsSolutionModal(repoId, issueNum);
+      };
+    });
+  }
+
+  function openOsSolutionModal(repoId, issueNum) {
+    if (!cachedOpenSourceData) return;
+    const repo = (cachedOpenSourceData.repositories || []).find((r) => r.id === repoId);
+    if (!repo) return;
+    const issue = (repo.issues || []).find((i) => i.number === issueNum);
+    if (!issue) return;
+
+    const analysis = issue.analysis || {};
+    const modal = document.getElementById("os-solution-modal");
+    const modalTitle = document.getElementById("modal-os-title");
+    const modalRepoBadge = document.getElementById("modal-os-repo-badge");
+    const modalGithubLink = document.getElementById("modal-os-github-link");
+    const modalBody = document.getElementById("modal-os-body");
+    const copyPatchBtn = document.getElementById("modal-os-copy-patch-btn");
+
+    if (!modal || !modalBody) return;
+
+    if (modalTitle) modalTitle.textContent = `Issue #${issue.number}: ${issue.title}`;
+    if (modalRepoBadge) modalRepoBadge.textContent = `${repo.fullName} · ${repo.primaryLanguage} (${analysis.difficulty || "Intermediate"})`;
+    if (modalGithubLink) modalGithubLink.href = issue.url;
+
+    const stepsHtml = (analysis.stepByStepSolution || [])
+      .map((step) => `<li style="margin-bottom:0.4rem; color:var(--text-muted);">${escapeHtml(step)}</li>`)
+      .join("");
+
+    const filesHtml = (analysis.filesToModify || [])
+      .map((f) => `<code style="background:rgba(255,255,255,0.06); padding:0.2rem 0.5rem; border-radius:4px; font-size:0.78rem; color:#a5b4fc; margin-right:0.4rem; display:inline-block; margin-bottom:0.3rem;">${escapeHtml(f)}</code>`)
+      .join("");
+
+    modalBody.innerHTML = `
+      <!-- Resume & Leverage Highlight -->
+      <div style="background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(16,185,129,0.1)); border: 1px solid rgba(99,102,241,0.3); padding: 1.1rem; border-radius: 10px; margin-bottom: 1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+        <div>
+          <span style="font-size:0.72rem; text-transform:uppercase; letter-spacing:1px; color:#10b981; font-weight:700;">🎯 HIGH-LEVERAGE CONTRIBUTION</span>
+          <h4 style="color:#fff; margin-top:0.2rem; font-family:'Outfit',sans-serif; font-size:1rem;">Targeted for Abhishek Tiwari's Full-Stack Engineering Profile</h4>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin-top:0.2rem;">Solving this issue establishes high-visibility credibility in the official <strong>${escapeHtml(repo.fullName)}</strong> repository.</p>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:1.6rem; font-family:'Outfit',sans-serif; font-weight:800; color:#10b981;">${analysis.impactScore || 94}/100</div>
+          <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase;">Impact Score</div>
+        </div>
+      </div>
+
+      <!-- Problem Diagnosis & Root Cause -->
+      <div style="margin-bottom: 1.25rem;">
+        <h4 style="color:#38bdf8; font-size:0.95rem; margin-bottom:0.4rem;">🔍 Architectural Diagnosis &amp; Root Cause</h4>
+        <p style="font-size:0.88rem; color:#fff; line-height:1.6; margin-bottom:0.5rem;">${escapeHtml(analysis.problemDiagnosis || "")}</p>
+        <div style="background:rgba(0,0,0,0.3); border-left:3px solid #f59e0b; padding:0.6rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.82rem; color:#fde68a;">
+          <strong>Root Cause:</strong> ${escapeHtml(analysis.rootCause || "")}
+        </div>
+      </div>
+
+      <!-- Files to Touch -->
+      <div style="margin-bottom: 1.25rem;">
+        <h4 style="color:#a5b4fc; font-size:0.9rem; margin-bottom:0.4rem;">📁 Likely Files to Modify:</h4>
+        <div>${filesHtml || "<code>src/index.ts</code>"}</div>
+      </div>
+
+      <!-- Step-by-Step Architecture Guide -->
+      <div style="margin-bottom: 1.25rem;">
+        <h4 style="color:#38bdf8; font-size:0.95rem; margin-bottom:0.4rem;">🛠️ Step-by-Step Implementation Guide</h4>
+        <ol style="padding-left:1.25rem; font-size:0.86rem; line-height:1.6;">
+          ${stepsHtml}
+        </ol>
+      </div>
+
+      <!-- Complete Code Solution Patch -->
+      <div style="margin-bottom: 1.25rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+          <h4 style="color:#10b981; font-size:0.95rem; margin:0;">💻 Production-Ready Code Solution Patch</h4>
+          <button class="btn secondary-btn" id="modal-os-copy-inner-btn" style="padding:0.25rem 0.65rem; font-size:0.75rem;">📋 Copy Code</button>
+        </div>
+        <pre class="curl-code-block" id="modal-os-code-patch" style="max-height:280px; overflow-y:auto; color:#a7f3d0; background:#040711; border-color:rgba(16,185,129,0.3);"><code>${escapeHtml(analysis.codeSolutionPatch || "")}</code></pre>
+      </div>
+
+      <!-- Testing Strategy -->
+      <div style="margin-bottom: 1.25rem;">
+        <h4 style="color:#fbbf24; font-size:0.9rem; margin-bottom:0.35rem;">🧪 Testing &amp; Verification Command</h4>
+        <pre class="curl-code-block" style="padding:0.5rem 0.85rem; color:#fde68a; font-size:0.8rem;"><code>${escapeHtml(analysis.testingStrategy || "npm test")}</code></pre>
+      </div>
+
+      <!-- Ready PR Submission Template -->
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+          <h4 style="color:#c084fc; font-size:0.9rem; margin:0;">🚀 Pull Request Submission Template</h4>
+          <button class="btn secondary-btn" id="modal-os-copy-pr-btn" style="padding:0.25rem 0.65rem; font-size:0.75rem;">📋 Copy PR Text</button>
+        </div>
+        <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.3rem;">PR Title: <code>${escapeHtml(analysis.prTitle || "")}</code></p>
+        <pre class="curl-code-block" id="modal-os-pr-text" style="max-height:160px; overflow-y:auto; font-size:0.78rem; color:#e9d5ff;"><code>${escapeHtml(analysis.prDescriptionTemplate || "")}</code></pre>
+      </div>
+    `;
+
+    // Attach copy actions inside modal
+    const copyInnerBtn = document.getElementById("modal-os-copy-inner-btn");
+    if (copyInnerBtn) {
+      copyInnerBtn.onclick = () => {
+        navigator.clipboard.writeText(analysis.codeSolutionPatch || "");
+        copyInnerBtn.textContent = "✓ Copied!";
+        setTimeout(() => (copyInnerBtn.textContent = "📋 Copy Code"), 2000);
+      };
+    }
+
+    const copyPrBtn = document.getElementById("modal-os-copy-pr-btn");
+    if (copyPrBtn) {
+      copyPrBtn.onclick = () => {
+        const text = `Title: ${analysis.prTitle}\n\n${analysis.prDescriptionTemplate}`;
+        navigator.clipboard.writeText(text);
+        copyPrBtn.textContent = "✓ Copied!";
+        setTimeout(() => (copyPrBtn.textContent = "📋 Copy PR Text"), 2000);
+      };
+    }
+
+    if (copyPatchBtn) {
+      copyPatchBtn.onclick = () => {
+        navigator.clipboard.writeText(analysis.codeSolutionPatch || "");
+        copyPatchBtn.textContent = "✓ Solution Copied!";
+        setTimeout(() => (copyPatchBtn.textContent = "📋 Copy Solution Patch"), 2000);
+      };
+    }
+
+    modal.style.display = "flex";
+  }
+
+  function initOpenSourceEventListeners() {
+    // Category chips
+    document.querySelectorAll("#os-category-filters .chip-btn").forEach((chip) => {
+      chip.onclick = () => {
+        document.querySelectorAll("#os-category-filters .chip-btn").forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+        activeOsCategory = chip.dataset.filter || "all";
+        renderFilteredOpenSourceRepos();
+      };
+    });
+
+    // Search input
+    const searchInput = document.getElementById("os-search-input");
+    if (searchInput) {
+      searchInput.oninput = (e) => {
+        osSearchTerm = e.target.value || "";
+        renderFilteredOpenSourceRepos();
+      };
+    }
+
+    // Modal Close
+    const modal = document.getElementById("os-solution-modal");
+    const closeBtn = document.getElementById("close-os-modal-btn");
+    const closeBottomBtn = document.getElementById("close-os-modal-bottom-btn");
+    if (closeBtn && modal) closeBtn.onclick = () => (modal.style.display = "none");
+    if (closeBottomBtn && modal) closeBottomBtn.onclick = () => (modal.style.display = "none");
+    if (modal) {
+      modal.onclick = (e) => {
+        if (e.target === modal) modal.style.display = "none";
+      };
+    }
+
+    // Scan & Refresh button
+    const refreshBtn = document.getElementById("refresh-opensource-btn");
+    if (refreshBtn) {
+      refreshBtn.onclick = async () => {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = `<span>⏳</span> Scanning 10 Repos with AI...`;
+        try {
+          await loadOpenSourceTab(true);
+          alert("🎉 Weekly Open-Source Intelligence scan complete! Analyzed 10 repositories and generated AI solution patches.");
+        } catch (err) {
+          alert(`Error: ${err.message}`);
+        } finally {
+          refreshBtn.disabled = false;
+          refreshBtn.innerHTML = `<span>🔄</span> Scan 10 Repos with AI Now`;
+        }
+      };
+    }
+
+    // Copy cURL button
+    const copyCurlBtn = document.getElementById("copy-opensource-curl-btn");
+    if (copyCurlBtn) {
+      copyCurlBtn.onclick = () => {
+        const cmd = `curl -s "https://career-digest.vercel.app/api/opensource"`;
+        navigator.clipboard.writeText(cmd);
+        copyCurlBtn.innerHTML = `<span>✓</span> Copied cURL!`;
+        setTimeout(() => (copyCurlBtn.innerHTML = `<span>📋</span> Copy OpenSource API cURL`), 2000);
       };
     }
   }

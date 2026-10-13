@@ -1,6 +1,7 @@
 import { generatePersonalSeoAnalysis } from "../llm/seoProfileEngine.js";
 import { fetchTrendTopics } from "../collectors/trends.js";
 import { fetchYouTubeTrends } from "../collectors/youtube.js";
+import { getLatestOpenSourceDigest } from "../llm/openSourceEngine.js";
 
 export interface SelfUpdatingStatus {
   active: boolean;
@@ -39,6 +40,9 @@ export async function performSelfUpdateCycle(): Promise<string> {
       fetchYouTubeTrends().catch(() => []),
     ]);
     cachedTrendsCount = trends.length + yttrends.length;
+
+    // 3. Ensure Weekly Open Source AI Digest is up to date (non-blocking)
+    getLatestOpenSourceDigest().catch((e) => console.warn(`[selfUpdatingEngine] OpenSource digest background update: ${e.message}`));
 
     lastLogMessage = `Cycle #${cycleCount} complete: Synced ${cachedTrendsCount} live trends & refreshed SEO recommendations for ${cachedSeoAnalysis.candidateName}`;
     console.log(`[selfUpdatingEngine] ${lastLogMessage}`);

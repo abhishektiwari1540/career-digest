@@ -24,6 +24,10 @@ export async function generateResilientText(
   // 1. Try Groq API (High Speed & Zero Quota Contention)
   if (config.groq.apiKey) {
     try {
+      const groqPrompt = options.jsonMode && !fullPrompt.toLowerCase().includes("json")
+        ? `Respond with valid JSON format.\n\n${fullPrompt}`
+        : fullPrompt;
+
       const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -32,7 +36,7 @@ export async function generateResilientText(
         },
         body: JSON.stringify({
           model: config.groq.model,
-          messages: [{ role: "user", content: fullPrompt }],
+          messages: [{ role: "user", content: groqPrompt }],
           temperature: options.temperature ?? 0.3,
           response_format: options.jsonMode ? { type: "json_object" } : undefined,
         }),
@@ -44,6 +48,9 @@ export async function generateResilientText(
         if (text && text.trim().length > 0) {
           return text.trim();
         }
+      } else {
+        const errJson = await groqRes.json().catch(() => ({}));
+        console.warn(`[resilientLlm] Groq returned ${groqRes.status}:`, errJson?.error?.message || groqRes.statusText);
       }
     } catch (err: any) {
       console.warn(`[resilientLlm] Groq API warning: ${formatLlmError(err)}. Trying OpenRouter/Gemini...`);

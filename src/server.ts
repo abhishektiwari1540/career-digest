@@ -57,6 +57,10 @@ import {
   generate10ViralPostsWorkflow,
   fetchLatestViralPosts,
 } from "./llm/viralPostEngine.js";
+import {
+  getLatestOpenSourceDigest,
+  runWeeklyOpenSourceEngine,
+} from "./llm/openSourceEngine.js";
 
 
 
@@ -95,6 +99,7 @@ app.use("/api", (req, res, next) => {
   if (
     urlPath.includes("viral-posts") ||
     urlPath.includes("blogs") ||
+    urlPath.includes("opensource") ||
     urlPath.includes("stats") ||
     urlPath.includes("memories") ||
     urlPath.includes("search") ||
@@ -126,7 +131,27 @@ app.use("/api", (req, res, next) => {
   next();
 });
 
-app.use(express.static(path.join(__dirname, "../public")));
+const publicPathCandidates = [
+  path.join(process.cwd(), "public"),
+  path.join(__dirname, "../public"),
+  path.join(__dirname, "../../public"),
+];
+const resolvedPublicPath = publicPathCandidates.find((p) => fs.existsSync(p)) || path.join(__dirname, "../public");
+app.use(express.static(resolvedPublicPath));
+
+app.get("/", (req, res, next) => {
+  const indexCandidates = [
+    path.join(resolvedPublicPath, "index.html"),
+    path.join(process.cwd(), "public/index.html"),
+    path.join(__dirname, "../public/index.html"),
+    path.join(__dirname, "../../public/index.html"),
+  ];
+  const foundIndex = indexCandidates.find((p) => fs.existsSync(p));
+  if (foundIndex) {
+    return res.sendFile(foundIndex);
+  }
+  next();
+});
 
 /**
  * CSV Helper: Parses LinkedIn Shares.csv with quoted text support
@@ -1112,6 +1137,36 @@ app.post("/api/viral-posts/generate", async (req, res) => {
       winner: result.winner,
       publishResults: result.publishResults,
       candidatesCount: result.candidates.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// Open Source AI Contribution Hub Endpoints
+// ----------------------------------------------------
+// GET /api/opensource - Retrieve Weekly 10 Analyzed Repositories & AI Solved Issues
+app.get("/api/opensource", async (req, res) => {
+  try {
+    const digest = await getLatestOpenSourceDigest();
+    res.json({
+      success: true,
+      digest,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/opensource/refresh - Force immediate fresh AI analysis of 10 open-source repositories
+app.post("/api/opensource/refresh", async (req, res) => {
+  try {
+    const digest = await runWeeklyOpenSourceEngine(true);
+    res.json({
+      success: true,
+      message: "Weekly Open-Source AI Analysis refreshed!",
+      digest,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
