@@ -8,10 +8,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let readingTimerSeconds = 0;
   let isTimerRunning = false;
   let currentReadingItem = null;
-  var cachedOpenSourceData = null;
-  var activeOsCategory = "all";
-  var osSearchTerm = "";
-  window.cachedOpenSourceData = null;
 
   // Navigation Tabs
   const tabBtns = document.querySelectorAll(".tab-btn");
@@ -1727,134 +1723,58 @@ document.addEventListener("DOMContentLoaded", () => {
   // ==========================================
   // TAB 7: OPEN-SOURCE AI CONTRIBUTION HUB
   // ==========================================
+  let cachedOpenSourceData = null;
+  let activeOsCategory = "all";
+  let osSearchTerm = "";
 
-  // Expose to window for inline HTML onclick handlers
-  window.loadOpenSourceTab = loadOpenSourceTab;
-
-  function updateOsMetrics() {
-    if (!cachedOpenSourceData) return;
+  async function loadOpenSourceTab(forceRefresh = false) {
+    const container = document.getElementById("os-repos-container");
     const statRepos = document.getElementById("os-stat-repos");
     const statIssues = document.getElementById("os-stat-issues");
     const statImpact = document.getElementById("os-stat-impact");
     const statPatches = document.getElementById("os-stat-patches");
 
-    const reposList = cachedOpenSourceData.repositories || [];
-    const totalIssues = cachedOpenSourceData.totalIssuesAnalyzed || reposList.reduce((acc, r) => acc + (r.issues || []).length, 0);
-
-    if (statRepos) statRepos.textContent = cachedOpenSourceData.totalRepositories || reposList.length || 10;
-    if (statIssues) statIssues.textContent = totalIssues || "--";
-    if (statImpact) statImpact.textContent = `${cachedOpenSourceData.avgImpactScore || 94}/100`;
-    if (statPatches) statPatches.textContent = "100% Ready";
-  }
-
-  async function fetchOpenSourceWithFallback(forceRefresh = false) {
-    const endpoints = forceRefresh
-      ? ["/api/opensource/refresh", "http://localhost:3008/api/opensource/refresh", "https://career-digest.vercel.app/api/opensource"]
-      : ["/openSourceData.json", "/api/opensource", "http://localhost:3008/api/opensource", "https://career-digest.vercel.app/api/opensource"];
-
-    let lastError = null;
-    for (const url of endpoints) {
-      try {
-        const method = (forceRefresh && url.includes("/refresh")) ? "POST" : "GET";
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
-        const res = await fetch(url, { method, signal: controller.signal });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const json = await res.json();
-          if (json && (json.digest || json.repositories)) {
-            return json;
-          }
-        }
-      } catch (err) {
-        lastError = err;
-      }
-    }
-    throw lastError || new Error("Failed to load open-source repository digest.");
-  }
-
-  async function syncOpenSourceDataSilently() {
-    try {
-      const data = await fetchOpenSourceWithFallback(false);
-      const fresh = data.digest || data;
-      if (fresh && fresh.repositories) {
-        cachedOpenSourceData = fresh;
-        window.cachedOpenSourceData = fresh;
-        try {
-          localStorage.setItem("career_digest_os_data", JSON.stringify(fresh));
-        } catch (e) {}
-        updateOsMetrics();
-        renderFilteredOpenSourceRepos();
-      }
-    } catch (e) {
-      // Background sync is silent
-    }
-  }
-
-  async function loadOpenSourceTab(forceRefresh = false) {
-    const container = document.getElementById("os-repos-container");
     if (!container) return;
 
-    // 1. FAST PATH (0ms Instant Load from memory or localStorage)
-    if (!cachedOpenSourceData && !forceRefresh) {
-      try {
-        const stored = localStorage.getItem("career_digest_os_data");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const candidate = parsed.digest || parsed;
-          if (candidate && candidate.repositories && candidate.repositories.length >= 10) {
-            cachedOpenSourceData = candidate;
-            window.cachedOpenSourceData = candidate;
-            updateOsMetrics();
-            renderFilteredOpenSourceRepos();
-            initOpenSourceEventListeners();
-          }
-        }
-      } catch (e) {}
-    }
-
-    // If already in memory and not forceRefresh, render immediately and sync background
-    if (cachedOpenSourceData && !forceRefresh) {
-      updateOsMetrics();
-      renderFilteredOpenSourceRepos();
-      initOpenSourceEventListeners();
-      syncOpenSourceDataSilently();
-      return;
-    }
-
-    // Show loading spinner if forcing refresh or no data yet
     if (!cachedOpenSourceData || forceRefresh) {
       container.innerHTML = `<div style="text-align:center; padding:3rem 1rem;">
         <div style="font-size:2.5rem; animation:spin 1s linear infinite; display:inline-block;">⚡</div>
-        <h4 style="color:#fff; margin-top:1rem; font-family:'Outfit',sans-serif;">Loading 10 High-Impact Repositories &amp; AI Solvers...</h4>
+        <h4 style="color:#fff; margin-top:1rem; font-family:'Outfit',sans-serif;">Scanning Tier-1 Repositories & Running Gemini Solvers...</h4>
         <p style="color:var(--text-muted); font-size:0.88rem; max-width:450px; margin:0.5rem auto;">Reading open issues, evaluating root causes, and generating production-ready code patches for Abhishek Tiwari's stack.</p>
       </div>`;
-    }
 
-    try {
-      const data = await fetchOpenSourceWithFallback(forceRefresh);
-      const fresh = data.digest || data;
-      if (fresh && fresh.repositories) {
-        cachedOpenSourceData = fresh;
-        window.cachedOpenSourceData = fresh;
-        try {
-          localStorage.setItem("career_digest_os_data", JSON.stringify(fresh));
-        } catch (e) {}
-      } else {
-        throw new Error(data.error || "Failed to load open-source intelligence.");
-      }
+      try {
+        const url = forceRefresh ? "/api/opensource/refresh" : "/api/opensource";
+        const method = forceRefresh ? "POST" : "GET";
+        const res = await fetch(url, { method });
+        const data = await res.json();
 
-      updateOsMetrics();
-      renderFilteredOpenSourceRepos();
-      initOpenSourceEventListeners();
-    } catch (err) {
-      if (!cachedOpenSourceData) {
+        if (data.success && data.digest) {
+          cachedOpenSourceData = data.digest;
+        } else if (data.repositories) {
+          cachedOpenSourceData = data;
+        } else {
+          throw new Error(data.error || "Failed to load open-source intelligence.");
+        }
+      } catch (err) {
         container.innerHTML = `<div class="error-banner" style="padding:1.5rem; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:10px; color:#f87171;">
           <strong>Error loading open-source digest:</strong> ${escapeHtml(err.message)}
-          <br/><button class="btn secondary-btn" onclick="window.loadOpenSourceTab(true)" style="margin-top:0.75rem;">Retry Scan</button>
+          <br/><button class="btn secondary-btn" onclick="loadOpenSourceTab(true)" style="margin-top:0.75rem;">Retry Scan</button>
         </div>`;
+        return;
       }
     }
+
+    // Update stats bar
+    if (cachedOpenSourceData) {
+      if (statRepos) statRepos.textContent = cachedOpenSourceData.totalRepositories || cachedOpenSourceData.repositories?.length || 10;
+      if (statIssues) statIssues.textContent = cachedOpenSourceData.totalIssuesAnalyzed || "--";
+      if (statImpact) statImpact.textContent = `${cachedOpenSourceData.avgImpactScore || 94}/100`;
+      if (statPatches) statPatches.textContent = "100% Ready";
+    }
+
+    renderFilteredOpenSourceRepos();
+    initOpenSourceEventListeners();
   }
 
   function renderFilteredOpenSourceRepos() {
