@@ -197,10 +197,36 @@ create table if not exists seo_metadata (
   updated_at timestamptz not null default now()
 );
 
+-- 17. Second Brain AI Copilot Chat Sessions
+create table if not exists chat_sessions (
+  id text primary key,
+  title text not null default 'New Conversation',
+  preset_mode text default 'deep_planner',
+  pinned boolean default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 18. Second Brain AI Copilot Chat Messages
+create table if not exists chat_messages (
+  id text primary key,
+  session_id text references chat_sessions(id) on delete cascade,
+  role text not null, -- 'user' | 'assistant'
+  content text not null,
+  prompt_corrected text,
+  attachments jsonb default '[]'::jsonb,
+  truth_score jsonb default null,
+  grounded_sources jsonb default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_chat_messages_session on chat_messages (session_id, created_at asc);
+
 -- ====================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES — ENFORCE DATA PRIVACY
 -- ====================================================================
 
+ALTER TABLE chat_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profile ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE brand_citations ENABLE ROW LEVEL SECURITY;
@@ -245,3 +271,6 @@ CREATE POLICY "Service role full access on syndication_log" ON syndication_log F
 CREATE POLICY "Service role full access on job_stats" ON job_stats FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service role full access on seo_metrics" ON seo_metrics FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service role full access on seo_metadata" ON seo_metadata FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service role full access on chat_sessions" ON chat_sessions FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service role full access on chat_messages" ON chat_messages FOR ALL USING (auth.role() = 'service_role');
+

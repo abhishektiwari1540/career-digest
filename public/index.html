@@ -73,7 +73,10 @@
 
     <!-- Navigation Tabs -->
     <nav class="nav-tabs">
-      <button class="tab-btn active" data-tab="tab-upload">
+      <button class="tab-btn active" data-tab="tab-chat">
+        <span class="icon">🤖</span> AI Copilot & Deep Idea Architect
+      </button>
+      <button class="tab-btn" data-tab="tab-upload">
         <span class="icon">📤</span> Ingest Data Files
       </button>
       <button class="tab-btn" data-tab="tab-explorer">
@@ -99,8 +102,148 @@
     <!-- Main Content Area -->
     <main class="content-area">
 
+      <!-- TAB 0: CHATGPT-GRADE AI COPILOT & DEEP IDEA ARCHITECT -->
+      <section id="tab-chat" class="tab-content active">
+        <div class="chatgpt-layout-container">
+          
+          <!-- Left Sidebar: Chat Sessions & Personas -->
+          <aside class="chat-sidebar" id="chat-sidebar">
+            <div class="sidebar-header">
+              <button class="btn new-chat-btn" id="new-chat-btn">
+                <span>➕</span> New Conversation
+              </button>
+            </div>
+
+            <div class="sidebar-modes">
+              <label class="sidebar-label">AI Persona Mode</label>
+              <div class="mode-chips">
+                <button class="mode-chip active" data-mode="deep_planner" title="10x Idea Blueprint & Phased Vision">🚀 10x Architect</button>
+                <button class="mode-chip" data-mode="fact_checker" title="Fact & Truth Verification with Database Citations">⚖️ Truth Checker</button>
+                <button class="mode-chip" data-mode="architect" title="Production TypeScript, Schemas & Microservices">💻 Code & System</button>
+                <button class="mode-chip" data-mode="general" title="Executive Second Brain Assistant">🧠 Second Brain</button>
+              </div>
+            </div>
+
+            <div class="sidebar-history-container">
+              <div class="sidebar-label-row">
+                <span class="sidebar-label">Chat History</span>
+                <span class="badge" id="session-count-badge">0</span>
+              </div>
+              <div class="session-history-list" id="session-history-list">
+                <div class="session-loading">Loading conversations...</div>
+              </div>
+            </div>
+
+            <div class="sidebar-footer">
+              <div class="vector-badge">
+                <span class="pulse-dot"></span>
+                <span>Vector RAG & 15+ Tables Grounded</span>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Main Chat Canvas -->
+          <div class="chat-main-canvas">
+            
+            <!-- Chat Top Bar -->
+            <div class="chat-canvas-header">
+              <div class="active-session-info">
+                <h3 id="current-chat-title">New Conversation</h3>
+                <span class="badge accent-badge" id="current-mode-badge">🚀 10x Architect</span>
+              </div>
+              <div class="chat-header-actions">
+                <button class="icon-action-btn" id="clear-chat-btn" title="Clear Current Chat">🗑️</button>
+              </div>
+            </div>
+
+            <!-- Messages Stream Area -->
+            <div class="chat-messages-container" id="chat-messages-container">
+              
+              <!-- Empty Welcome State -->
+              <div class="chat-empty-state" id="chat-empty-state">
+                <div class="empty-icon-glow">🤖</div>
+                <h2>Second Brain AI Copilot & Deep Idea Architect</h2>
+                <p>Ground your vision against 15+ Supabase tables, vector embeddings, and real-time accuracy scoring. Drop files, attach images, or speak your mind.</p>
+                
+                <div class="prompt-starter-grid">
+                  <div class="starter-card" data-prompt="Architect an autonomous multi-agent microservice pipeline using Node.js, BullMQ, and Supabase pgvector with 10x scalability.">
+                    <span class="starter-icon">🚀</span>
+                    <h4>10x Architecture Blueprint</h4>
+                    <p>Multi-agent microservice pipeline with pgvector & BullMQ</p>
+                  </div>
+                  <div class="starter-card" data-prompt="Fact-check my premise: 'Supabase vector search with 768-d Gemini embeddings can handle 10,000 queries/sec with sub-50ms latency.' Evaluate against database tables.">
+                    <span class="starter-icon">⚖️</span>
+                    <h4>Truth & Accuracy Check</h4>
+                    <p>Validate technical claim against database & latency realities</p>
+                  </div>
+                  <div class="starter-card" data-prompt="Here is my raw idea: I want to build an AI agent that automatically monitors tech trends, scores skill match, and creates daily viral blog posts. Make this idea fire with a 5-level deep blueprint.">
+                    <span class="starter-icon">🔥</span>
+                    <h4>Make Idea Fire (5 Levels)</h4>
+                    <p>Deep-dive from 10x moat down to code, roadmaps & monetization</p>
+                  </div>
+                  <div class="starter-card" data-prompt="Query my second brain memories and past reading logs: summarize my core competencies, recent research topics, and best next steps.">
+                    <span class="starter-icon">🧠</span>
+                    <h4>Recall Second Brain Knowledge</h4>
+                    <p>Synthesize memories, projects & reading logs from database</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Dynamically populated message bubbles -->
+            </div>
+
+            <!-- Bottom Sticky Input Bar -->
+            <div class="chat-input-wrapper">
+              
+              <!-- Attachment Previews Container -->
+              <div class="attachments-preview-bar" id="attachments-preview-bar" style="display:none;"></div>
+
+              <!-- Voice Recording Live Indicator -->
+              <div class="voice-recording-banner" id="voice-recording-banner" style="display:none;">
+                <div class="voice-wave">
+                  <span></span><span></span><span></span><span></span><span></span>
+                </div>
+                <span class="voice-text">Listening... Speak your idea clearly (click 🛑 to stop)</span>
+                <button type="button" class="btn-voice-stop" id="voice-stop-btn">🛑 Stop</button>
+              </div>
+
+              <div class="chat-input-bar">
+                <!-- File / Image Attachment Button -->
+                <button type="button" class="tool-btn" id="attach-file-btn" title="Attach Image, PDF, Doc, or Code (.png, .jpg, .pdf, .txt, .csv, .json)">
+                  📎
+                </button>
+                <input type="file" id="chat-file-input" hidden accept=".png,.jpg,.jpeg,.webp,.pdf,.doc,.docx,.txt,.csv,.json,.md,.ts,.js">
+
+                <!-- Voice-to-Text Microphone Button -->
+                <button type="button" class="tool-btn mic-btn" id="voice-mic-btn" title="Click to Speak (Voice-to-Text)">
+                  🎙️
+                </button>
+
+                <!-- Prompt Input Textarea -->
+                <textarea 
+                  id="chat-prompt-input" 
+                  rows="1" 
+                  placeholder="Ask a question, propose an idea, or click 🎙️ to dictate..."
+                ></textarea>
+
+                <!-- Send Button -->
+                <button type="button" class="send-btn" id="chat-send-btn" title="Send (Enter)">
+                  ➔
+                </button>
+              </div>
+
+              <div class="chat-input-footer-note">
+                Auto-Prompt Correction active • Vector RAG & 15+ Supabase tables grounded • Press <kbd>Shift + Enter</kbd> for newline
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
       <!-- TAB 1: UPLOAD CENTER -->
-      <section id="tab-upload" class="tab-content active">
+      <section id="tab-upload" class="tab-content">
         <div class="section-card">
           <div class="section-header">
             <h2>📥 Ingest Knowledge Files into Second Brain</h2>

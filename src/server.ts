@@ -61,6 +61,14 @@ import {
   getLatestOpenSourceDigest,
   runWeeklyOpenSourceEngine,
 } from "./llm/openSourceEngine.js";
+import {
+  createChatSession,
+  getChatSessions,
+  deleteChatSession,
+  getSessionMessages,
+  executeChatCopilotFlow,
+  AttachmentItem,
+} from "./llm/chatCopilotEngine.js";
 
 
 
@@ -108,6 +116,7 @@ app.use("/api", (req, res, next) => {
     urlPath.includes("self-update") ||
     urlPath.includes("google-search") ||
     urlPath.includes("upload") ||
+    urlPath.includes("chat") ||
     urlPath.includes("cron")
   ) {
     return next();
@@ -1193,6 +1202,128 @@ app.post("/api/self-update/toggle", (req, res) => {
   const { active } = req.body;
   setSelfUpdatingActive(Boolean(active));
   res.json({ success: true, status: getSelfUpdatingStatus() });
+});
+
+// ==========================================
+// CHATGPT-GRADE AI COPILOT & IDEA ARCHITECT
+// ==========================================
+
+// GET /api/chat/sessions - Fetch all chat conversation sessions
+app.get("/api/chat/sessions", async (req, res) => {
+  try {
+    const sessions = await getChatSessions();
+    res.json({ success: true, sessions });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/chat/sessions - Create new chat session
+app.post("/api/chat/sessions", async (req, res) => {
+  try {
+    const { title, presetMode } = req.body;
+    const session = await createChatSession(title, presetMode);
+    res.json({ success: true, session });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/chat/sessions/:id - Delete a chat session
+app.delete("/api/chat/sessions/:id", async (req, res) => {
+  try {
+    await deleteChatSession(req.params.id as string);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/chat/sessions/:id/messages - Get messages in a session
+app.get("/api/chat/sessions/:id/messages", async (req, res) => {
+  try {
+    const messages = await getSessionMessages(req.params.id as string);
+    res.json({ success: true, messages });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/chat/upload - Upload file, image, doc, or PDF for chat analysis
+app.post("/api/chat/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: "No file provided" });
+    }
+
+    const file = req.file;
+    const fileName = file.originalname;
+    const mimeType = file.mimetype || "application/octet-stream";
+    const fileExt = path.extname(fileName).toLowerCase();
+    const buffer = file.buffer;
+
+    let base64Data: string | undefined = undefined;
+    let extractedText: string | undefined = undefined;
+
+    if (mimeType.startsWith("image/") || [".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(fileExt)) {
+      base64Data = `data:${mimeType};base64,${buffer.toString("base64")}`;
+    } else if (fileExt === ".pdf") {
+      try {
+        const pdfParse = require("pdf-parse");
+        const parsed = await pdfParse(buffer);
+        extractedText = parsed.text || "";
+      } catch (pdfErr: any) {
+        extractedText = buffer.toString("utf-8");
+      }
+    } else {
+      // Text files, json, csv, markdown, code
+      extractedText = buffer.toString("utf-8");
+    }
+
+    const attachment: AttachmentItem = {
+      id: `att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      name: fileName,
+      type: mimeType,
+      size: file.size,
+      base64Data,
+      extractedText,
+    };
+
+    res.json({ success: true, attachment });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/chat/message - Execute full Copilot inference with vector RAG & truth fact-checker
+app.post("/api/chat/message", async (req, res) => {
+  try {
+    const { sessionId, prompt, presetMode, attachments, history } = req.body;
+    if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({ success: false, error: "Prompt is required" });
+    }
+
+    const currentSessionId = sessionId || `sess_${Date.now()}`;
+    const result = await executeChatCopilotFlow({
+      sessionId: currentSessionId,
+      rawPrompt: prompt,
+      presetMode: presetMode || "deep_planner",
+      attachments: attachments || [],
+      history: history || [],
+    });
+
+    res.json({
+      success: true,
+      sessionId: currentSessionId,
+      response: result.assistantResponse,
+      promptCorrected: result.promptCorrected,
+      truthScore: result.truthScore,
+      groundedSources: result.groundedSources,
+    });
+  } catch (err: any) {
+    console.error("[server] /api/chat/message error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 export default app;
