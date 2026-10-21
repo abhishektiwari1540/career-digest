@@ -4,7 +4,7 @@ stages:
   - execute
 
 default:
-  image: node:20-slim
+  image: node:22-slim
 
 cache:
   paths:

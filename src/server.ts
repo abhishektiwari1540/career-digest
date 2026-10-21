@@ -8,6 +8,27 @@ if (typeof (globalThis as any).Path2D === "undefined") {
 if (typeof (globalThis as any).ImageData === "undefined") {
   (globalThis as any).ImageData = class ImageData {};
 }
+// WebSocket polyfill stub for Node.js < 22 environments (required by @supabase/realtime-js)
+if (typeof (globalThis as any).WebSocket === "undefined") {
+  class NodeWebSocketStub {
+    static readonly CONNECTING = 0;
+    static readonly OPEN = 1;
+    static readonly CLOSING = 2;
+    static readonly CLOSED = 3;
+    readonly CONNECTING = 0;
+    readonly OPEN = 1;
+    readonly CLOSING = 2;
+    readonly CLOSED = 3;
+    readyState = 3;
+    onopen = null;
+    onclose = null;
+    onerror = null;
+    onmessage = null;
+    close() {}
+    send() {}
+  }
+  (globalThis as any).WebSocket = NodeWebSocketStub;
+}
 
 import express from "express";
 import fs from "fs";

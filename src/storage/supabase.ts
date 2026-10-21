@@ -9,7 +9,38 @@ import type {
   TrendTopic,
 } from "../types.js";
 
-export const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+// Ensure WebSocket constructor exists in Node.js < 22 environments where native WebSocket is missing,
+// preventing "@supabase/realtime-js" initialization error on Node 20 and below.
+if (typeof (globalThis as any).WebSocket === "undefined") {
+  class NodeWebSocketStub {
+    static readonly CONNECTING = 0;
+    static readonly OPEN = 1;
+    static readonly CLOSING = 2;
+    static readonly CLOSED = 3;
+    readonly CONNECTING = 0;
+    readonly OPEN = 1;
+    readonly CLOSING = 2;
+    readonly CLOSED = 3;
+    readyState = 3;
+    onopen = null;
+    onclose = null;
+    onerror = null;
+    onmessage = null;
+    close() {}
+    send() {}
+  }
+  (globalThis as any).WebSocket = NodeWebSocketStub;
+}
+
+export const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+  realtime: {
+    transport: (globalThis as any).WebSocket,
+  },
+});
 
 export async function upsertJobListings(jobs: JobListing[]) {
   if (jobs.length === 0) return;

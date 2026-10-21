@@ -2087,11 +2087,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // =========================================================================
   let chatInitialized = false;
   let currentSessionId = localStorage.getItem("career_digest_active_session") || "";
-  let currentPresetMode = "deep_planner";
   let currentAttachments = [];
   let chatMessagesHistory = [];
   let speechRecognition = null;
   let isRecordingVoice = false;
+
+  const CHAT_API_BASE = (window.location.port === "3005" || window.location.port === "3000") ? "" : "http://localhost:3005";
 
   function initChatCopilot() {
     if (chatInitialized) return;
@@ -2106,26 +2107,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const micBtn = document.getElementById("voice-mic-btn");
     const voiceStopBtn = document.getElementById("voice-stop-btn");
 
-    // Setup mode chips
-    const modeChips = document.querySelectorAll(".mode-chip");
     const modeBadge = document.getElementById("current-mode-badge");
-    const modeLabels = {
-      deep_planner: "🚀 10x Architect",
-      fact_checker: "⚖️ Truth Checker",
-      architect: "💻 Code & System",
-      general: "🧠 Second Brain",
-    };
-
-    modeChips.forEach((chip) => {
-      chip.addEventListener("click", () => {
-        modeChips.forEach((c) => c.classList.remove("active"));
-        chip.classList.add("active");
-        currentPresetMode = chip.getAttribute("data-mode") || "deep_planner";
-        if (modeBadge) {
-          modeBadge.textContent = modeLabels[currentPresetMode] || "🚀 10x Architect";
-        }
-      });
-    });
+    if (modeBadge) {
+      modeBadge.textContent = "⚡ Combined 4-in-1 Engine";
+    }
 
     // Auto-resizing textarea
     if (promptInput) {
@@ -2297,7 +2282,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const formData = new FormData();
           formData.append("file", file);
 
-          const res = await fetch("/api/chat/upload", {
+          const res = await fetch(`${CHAT_API_BASE}/api/chat/upload`, {
             method: "POST",
             body: formData,
           });
@@ -2360,7 +2345,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const countBadge = document.getElementById("session-count-badge");
 
     try {
-      const res = await fetch("/api/chat/sessions");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      const res = await fetch(`${CHAT_API_BASE}/api/chat/sessions`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       const data = await res.json();
 
       if (data.success && Array.isArray(data.sessions)) {
@@ -2368,9 +2359,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (data.sessions.length === 0) {
           if (listEl) {
-            listEl.innerHTML = `<div class="session-loading">No past chats yet. Start a new idea!</div>`;
+            listEl.innerHTML = `<div class="session-item active" data-id="sess_init"><span class="session-item-title">💬 Current Conversation</span></div>`;
           }
-          handleCreateNewChat(false);
+          currentSessionId = "sess_" + Date.now();
           return;
         }
 
@@ -2402,7 +2393,7 @@ document.addEventListener("DOMContentLoaded", () => {
               const sid = btn.getAttribute("data-id");
               if (!sid) return;
               if (confirm("Delete this conversation?")) {
-                await fetch(`/api/chat/sessions/${sid}`, { method: "DELETE" });
+                await fetch(`${CHAT_API_BASE}/api/chat/sessions/${sid}`, { method: "DELETE" }).catch(() => {});
                 if (sid === currentSessionId) {
                   currentSessionId = "";
                   localStorage.removeItem("career_digest_active_session");
@@ -2419,11 +2410,18 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
           selectChatSession(currentSessionId);
         }
+        return;
       }
     } catch (err) {
-      if (listEl) {
-        listEl.innerHTML = `<div class="session-loading">Session offline. Local mode active.</div>`;
-      }
+      console.warn("[Chat] Session load fallback:", err.message);
+    }
+
+    // Resilient fallback so list is NEVER stuck on "Loading conversations..."
+    if (listEl) {
+      listEl.innerHTML = `<div class="session-item active" data-id="sess_init"><span class="session-item-title">💬 Current Conversation</span></div>`;
+    }
+    if (!currentSessionId) {
+      currentSessionId = "sess_" + Date.now();
     }
   }
 
@@ -2442,7 +2440,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatTitle = document.getElementById("current-chat-title");
 
     try {
-      const res = await fetch(`/api/chat/sessions/${sessionId}/messages`);
+      const res = await fetch(`${CHAT_API_BASE}/api/chat/sessions/${sessionId}/messages`);
       const data = await res.json();
 
       if (data.success && Array.isArray(data.messages)) {
@@ -2458,7 +2456,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (emptyState) messagesContainer.appendChild(emptyState);
             if (chatTitle) chatTitle.textContent = "New Conversation";
           } else {
-            // Find first user message for title
             const firstUserMsg = data.messages.find((m) => m.role === "user");
             if (chatTitle && firstUserMsg) {
               chatTitle.textContent =
@@ -2489,12 +2486,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // Create New Chat
   async function handleCreateNewChat(selectAfter = true) {
     try {
-      const res = await fetch("/api/chat/sessions", {
+      const res = await fetch(`${CHAT_API_BASE}/api/chat/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: "New Conversation",
-          presetMode: currentPresetMode,
+          presetMode: "combined_engine",
         }),
       });
 
@@ -2502,52 +2499,53 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.success && data.session) {
         currentSessionId = data.session.id;
         localStorage.setItem("career_digest_active_session", currentSessionId);
-        chatMessagesHistory = [];
-
-        const messagesContainer = document.getElementById("chat-messages-container");
-        const chatTitle = document.getElementById("current-chat-title");
-        if (chatTitle) chatTitle.textContent = "New Conversation";
-
-        if (messagesContainer) {
-          messagesContainer.innerHTML = `
-            <div class="chat-empty-state" id="chat-empty-state">
-              <div class="empty-icon-glow">🤖</div>
-              <h2>Second Brain AI Copilot & Deep Idea Architect</h2>
-              <p>Ground your vision against 15+ Supabase tables, vector embeddings, and real-time accuracy scoring. Drop files, attach images, or speak your mind.</p>
-              
-              <div class="prompt-starter-grid">
-                <div class="starter-card" data-prompt="Architect an autonomous multi-agent microservice pipeline using Node.js, BullMQ, and Supabase pgvector with 10x scalability.">
-                  <span class="starter-icon">🚀</span>
-                  <h4>10x Architecture Blueprint</h4>
-                  <p>Multi-agent microservice pipeline with pgvector & BullMQ</p>
-                </div>
-                <div class="starter-card" data-prompt="Fact-check my premise: 'Supabase vector search with 768-d Gemini embeddings can handle 10,000 queries/sec with sub-50ms latency.' Evaluate against database tables.">
-                  <span class="starter-icon">⚖️</span>
-                  <h4>Truth & Accuracy Check</h4>
-                  <p>Validate technical claim against database & latency realities</p>
-                </div>
-                <div class="starter-card" data-prompt="Here is my raw idea: I want to build an AI agent that automatically monitors tech trends, scores skill match, and creates daily viral blog posts. Make this idea fire with a 5-level deep blueprint.">
-                  <span class="starter-icon">🔥</span>
-                  <h4>Make Idea Fire (5 Levels)</h4>
-                  <p>Deep-dive from 10x moat down to code, roadmaps & monetization</p>
-                </div>
-                <div class="starter-card" data-prompt="Query my second brain memories and past reading logs: summarize my core competencies, recent research topics, and best next steps.">
-                  <span class="starter-icon">🧠</span>
-                  <h4>Recall Second Brain Knowledge</h4>
-                  <p>Synthesize memories, projects & reading logs from database</p>
-                </div>
-              </div>
-            </div>
-          `;
-          setupStarterCards();
-        }
-
-        if (selectAfter) {
-          loadChatSessions();
-        }
       }
     } catch (err) {
-      console.warn("[Chat] Create session fallback:", err.message);
+      currentSessionId = "sess_" + Date.now();
+      localStorage.setItem("career_digest_active_session", currentSessionId);
+    }
+
+    chatMessagesHistory = [];
+    const messagesContainer = document.getElementById("chat-messages-container");
+    const chatTitle = document.getElementById("current-chat-title");
+    if (chatTitle) chatTitle.textContent = "New Conversation";
+
+    if (messagesContainer) {
+      messagesContainer.innerHTML = `
+        <div class="chat-empty-state" id="chat-empty-state">
+          <div class="empty-icon-glow">🤖</div>
+          <h2>Second Brain AI Copilot & Deep Idea Architect</h2>
+          <p>Ground your vision against 15+ Supabase tables, vector embeddings, and real-time accuracy scoring. Drop files, attach images, or speak your mind.</p>
+          
+          <div class="prompt-starter-grid">
+            <div class="starter-card" data-prompt="Architect an autonomous multi-agent microservice pipeline using Node.js, BullMQ, and Supabase pgvector with 10x scalability.">
+              <span class="starter-icon">🚀</span>
+              <h4>10x Architecture Blueprint</h4>
+              <p>Multi-agent microservice pipeline with pgvector & BullMQ</p>
+            </div>
+            <div class="starter-card" data-prompt="Fact-check my premise: 'Supabase vector search with 768-d Gemini embeddings can handle 10,000 queries/sec with sub-50ms latency.' Evaluate against database tables.">
+              <span class="starter-icon">⚖️</span>
+              <h4>Truth & Accuracy Check</h4>
+              <p>Validate technical claim against database & latency realities</p>
+            </div>
+            <div class="starter-card" data-prompt="Here is my raw idea: I want to build an AI agent that automatically monitors tech trends, scores skill match, and creates daily viral blog posts. Make this idea fire with a 5-level deep blueprint.">
+              <span class="starter-icon">🔥</span>
+              <h4>Make Idea Fire (5 Levels)</h4>
+              <p>Deep-dive from 10x moat down to code, roadmaps & monetization</p>
+            </div>
+            <div class="starter-card" data-prompt="Query my second brain memories and past reading logs: summarize my core competencies, recent research topics, and best next steps.">
+              <span class="starter-icon">🧠</span>
+              <h4>Recall Second Brain Knowledge</h4>
+              <p>Synthesize memories, projects & reading logs from database</p>
+            </div>
+          </div>
+        </div>
+      `;
+      setupStarterCards();
+    }
+
+    if (selectAfter) {
+      loadChatSessions();
     }
   }
 
@@ -2599,13 +2597,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      const res = await fetch("/api/chat/message", {
+      const res = await fetch(`${CHAT_API_BASE}/api/chat/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId: currentSessionId || `sess_${Date.now()}`,
           prompt,
-          presetMode: currentPresetMode,
+          presetMode: "combined_engine",
           attachments: attachedItems,
           history: chatMessagesHistory,
         }),
@@ -2645,7 +2643,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       if (typingIndicator) typingIndicator.remove();
       renderAssistantMessageBubble({
-        content: `⚠️ **Connection Error:** ${err.message}. Ensure your server is running on port 3005.`,
+        content: `⚠️ **Connection Error:** ${err.message}. Please ensure the server is running on port 3005 (\`npm run dev\`).`,
       });
     } finally {
       if (sendBtn) sendBtn.disabled = false;
@@ -2868,6 +2866,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     return html;
   }
+
+  function escapeHtml(str) {
     if (!str) return "";
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
@@ -2877,3 +2877,4 @@ document.addEventListener("DOMContentLoaded", () => {
     return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 });
+

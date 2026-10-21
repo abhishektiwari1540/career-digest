@@ -23,23 +23,6 @@
           <p class="subtitle">Personal Knowledge Engine, Grounded SEO & Self-Updating Growth Hub</p>
         </div>
       </div>
-      <div class="system-status">
-        <div class="status-badge live">
-          <span class="dot"></span> Gemini Embedding-2
-        </div>
-        <div class="status-badge live">
-          <span class="dot"></span> Supabase Vector Storage
-        </div>
-        <div class="status-badge active" id="engine-status-badge">
-          <span class="dot"></span> ⚡ Self-Updating: <span id="engine-timer-display">Active (60s)</span>
-        </div>
-        <button class="btn secondary-btn" id="force-sync-btn" title="Force Immediate Self-Update Cycle" style="padding:0.35rem 0.75rem; font-size:0.75rem; display:flex; align-items:center; gap:0.3rem;">
-          <span>🔄</span> Engine Sync
-        </button>
-        <button class="btn primary-btn" id="sync-website-seo-btn" title="Sync SEO Metadata to https://www.abhishektiwari.online/" style="padding:0.35rem 0.85rem; font-size:0.75rem; display:flex; align-items:center; gap:0.4rem; background:linear-gradient(135deg, #10b981, #059669); border:none; box-shadow:0 4px 14px rgba(16,185,129,0.3);">
-          <span>🌐</span> Sync SEO to Website
-        </button>
-      </div>
     </header>
 
     <!-- Metrics Bar -->
@@ -74,28 +57,28 @@
     <!-- Navigation Tabs -->
     <nav class="nav-tabs">
       <button class="tab-btn active" data-tab="tab-chat">
-        <span class="icon">🤖</span> AI Copilot & Deep Idea Architect
+        <span class="icon">🤖</span> AI Copilot
       </button>
       <button class="tab-btn" data-tab="tab-upload">
-        <span class="icon">📤</span> Ingest Data Files
+        <span class="icon">📥</span> Ingest Data
       </button>
       <button class="tab-btn" data-tab="tab-explorer">
-        <span class="icon">🔍</span> Brain Explorer & Vector Search
+        <span class="icon">🔍</span> Brain Explorer
       </button>
       <button class="tab-btn" data-tab="tab-seo">
-        <span class="icon">📈</span> Personal SEO & Content Strategy
+        <span class="icon">📈</span> SEO Strategy
       </button>
       <button class="tab-btn" data-tab="tab-read">
-        <span class="icon">📚</span> What to Read & Time Tracker
+        <span class="icon">📚</span> Reading Tracker
       </button>
       <button class="tab-btn" data-tab="tab-platforms">
-        <span class="icon">🌐</span> Auto-Post & Skill Monitor
+        <span class="icon">🌐</span> Auto-Publish
       </button>
       <button class="tab-btn" data-tab="tab-blogs">
-        <span class="icon">🏆</span> Daily 12-Blog Competition & Portfolio Sync
+        <span class="icon">🏆</span> Daily Blogs
       </button>
       <button class="tab-btn" data-tab="tab-opensource">
-        <span class="icon">🐙</span> Open-Source AI Contribution Hub
+        <span class="icon">🐙</span> Open Source AI
       </button>
     </nav>
 
@@ -114,13 +97,17 @@
               </button>
             </div>
 
-            <div class="sidebar-modes">
-              <label class="sidebar-label">AI Persona Mode</label>
-              <div class="mode-chips">
-                <button class="mode-chip active" data-mode="deep_planner" title="10x Idea Blueprint & Phased Vision">🚀 10x Architect</button>
-                <button class="mode-chip" data-mode="fact_checker" title="Fact & Truth Verification with Database Citations">⚖️ Truth Checker</button>
-                <button class="mode-chip" data-mode="architect" title="Production TypeScript, Schemas & Microservices">💻 Code & System</button>
-                <button class="mode-chip" data-mode="general" title="Executive Second Brain Assistant">🧠 Second Brain</button>
+            <div class="sidebar-unified-card">
+              <div class="unified-title-row">
+                <span class="unified-status-icon">⚡</span>
+                <span class="unified-main-title">Unified 4-in-1 Intelligence</span>
+              </div>
+              <div class="unified-desc">Combined &amp; Grounded for <strong>Abhishek Tiwari</strong></div>
+              <div class="unified-pill-row">
+                <span class="upill">🚀 10x Vision</span>
+                <span class="upill">⚖️ Truth Check</span>
+                <span class="upill">💻 Code &amp; Schema</span>
+                <span class="upill">🧠 Second Brain</span>
               </div>
             </div>
 
@@ -149,7 +136,7 @@
             <div class="chat-canvas-header">
               <div class="active-session-info">
                 <h3 id="current-chat-title">New Conversation</h3>
-                <span class="badge accent-badge" id="current-mode-badge">🚀 10x Architect</span>
+                <span class="badge accent-badge" id="current-mode-badge">⚡ Combined 4-in-1 Engine</span>
               </div>
               <div class="chat-header-actions">
                 <button class="icon-action-btn" id="clear-chat-btn" title="Clear Current Chat">🗑️</button>

@@ -1,5 +1,5 @@
 # Use official Node.js image for building
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY src ./src
 RUN npm run build
 
 # Production image
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 
 WORKDIR /app
 

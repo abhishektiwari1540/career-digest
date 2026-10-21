@@ -4,6 +4,9 @@
   "private": true,
   "description": "Daily career intelligence digest: legitimate job + trend + event feeds, scored with Gemini, stored in Supabase, delivered by email.",
   "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "build": "tsc -p .",
     "start": "node dist/src/server.js",
