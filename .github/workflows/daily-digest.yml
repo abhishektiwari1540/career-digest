@@ -23,7 +23,7 @@ jobs:
           node-version: "22"
       - run: npm ci
       - run: npm run build
-      - run: npm start
+      - run: node dist/src/index.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

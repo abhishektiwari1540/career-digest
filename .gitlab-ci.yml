@@ -36,7 +36,7 @@ scheduled-digest-run:
   script:
     - npm ci
     - npm run build
-    - npm start
+    - node dist/src/index.js
   only:
     - schedules
     - web
