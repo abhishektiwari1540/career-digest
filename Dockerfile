@@ -1,36 +1,46 @@
-# Use official Node.js image for building
+# Stage 1: Build stage with compiler toolchain for native node-gyp addons (better-sqlite3)
 FROM node:22-slim AS builder
 
 WORKDIR /app
 
-# Install native compilation dependencies for node-gyp (e.g. better-sqlite3 in devDependencies)
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Install native compilation dependencies for node-gyp
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency definitions
+# Copy dependency specifications
 COPY package*.json tsconfig.json ./
 
-# Install all dependencies including devDependencies
+# Install all dependencies (including devDependencies for TypeScript compilation)
 RUN npm ci
 
-# Copy source files
+# Copy source code and static web assets
 COPY src ./src
+COPY public ./public
 
-# Build TypeScript code
+# Build TypeScript to dist/
 RUN npm run build
 
-# Production image
+# Prune devDependencies to leave only production packages with their pre-compiled native binaries
+RUN npm prune --omit=dev && npm cache clean --force
+
+# Stage 2: Ultra-slim production runtime image
 FROM node:22-slim AS runner
 
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV PORT=3005
 
-# Copy package files and install production dependencies only
-COPY package*.json ./
-RUN npm ci --omit=dev
-
-# Copy built dist files from builder stage
+# Copy pre-compiled production node_modules directly from builder (avoids node-gyp rebuild in runner)
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
+COPY package*.json ./
 
-# Run index.js on container startup
-CMD ["node", "dist/src/index.js"]
+EXPOSE 3005
+
+# Run Express server by default
+CMD ["node", "dist/src/server.js"]
