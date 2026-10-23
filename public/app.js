@@ -29,6 +29,75 @@ document.addEventListener("DOMContentLoaded", () => {
     return fetch(url, opts);
   }
 
+  // Central Modern Confirmation Dialog System
+  function showAppConfirm({
+    title = "Confirm Action",
+    subtitle = "Please review before proceeding",
+    message = "Are you sure you want to perform this action?",
+    warning = "",
+    icon = "⚠️",
+    confirmText = "Confirm",
+    confirmClass = "danger",
+  } = {}) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById("app-action-confirm-modal");
+      if (!modal) {
+        resolve(window.confirm(message));
+        return;
+      }
+      const titleEl = document.getElementById("action-confirm-title");
+      const subEl = document.getElementById("action-confirm-subtitle");
+      const msgEl = document.getElementById("action-confirm-message");
+      const warnBox = document.getElementById("action-confirm-warning");
+      const warnText = document.getElementById("action-confirm-warning-text");
+      const iconEl = document.getElementById("action-confirm-icon");
+      const confirmBtn = document.getElementById("accept-action-confirm-btn");
+      const cancelBtn = document.getElementById("cancel-action-confirm-btn");
+      const closeBtn = document.getElementById("close-action-confirm-btn");
+
+      if (titleEl) titleEl.textContent = title;
+      if (subEl) subEl.textContent = subtitle;
+      if (msgEl) msgEl.textContent = message;
+      if (iconEl) iconEl.textContent = icon;
+      if (warnBox && warnText) {
+        if (warning) {
+          warnText.textContent = warning;
+          warnBox.style.display = "flex";
+        } else {
+          warnBox.style.display = "none";
+        }
+      }
+      if (confirmBtn) {
+        confirmBtn.textContent = confirmText;
+        if (confirmClass === "danger") {
+          confirmBtn.style.background = "linear-gradient(135deg, #ef4444, #dc2626)";
+          confirmBtn.style.boxShadow = "0 4px 18px rgba(239,68,68,0.45)";
+        } else {
+          confirmBtn.style.background = "linear-gradient(135deg, #6366f1, #4f46e5)";
+          confirmBtn.style.boxShadow = "0 4px 18px rgba(99,102,241,0.45)";
+        }
+      }
+
+      function cleanup(result) {
+        modal.style.display = "none";
+        if (confirmBtn) confirmBtn.onclick = null;
+        if (cancelBtn) cancelBtn.onclick = null;
+        if (closeBtn) closeBtn.onclick = null;
+        modal.onclick = null;
+        resolve(result);
+      }
+
+      if (confirmBtn) confirmBtn.onclick = () => cleanup(true);
+      if (cancelBtn) cancelBtn.onclick = () => cleanup(false);
+      if (closeBtn) closeBtn.onclick = () => cleanup(false);
+      modal.onclick = (e) => {
+        if (e.target === modal) cleanup(false);
+      };
+
+      modal.style.display = "flex";
+    });
+  }
+
   // Global State
   let activeTab = "tab-chat";
   let cachedMemories = [];
@@ -1541,9 +1610,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const site = userWebsites.find(w => w.id === currentActiveWebsiteId);
         if (!site) return;
 
-        if (!confirm(`Are you sure you want to remove website "${site.site_name}"? Embedded scripts on that domain will stop serving dynamic SEO.`)) {
-          return;
-        }
+        const confirmed = await showAppConfirm({
+          title: "Remove Website?",
+          subtitle: "Dynamic SEO Script Deactivation",
+          message: `Are you sure you want to remove website "${site.site_name}" (${site.site_url})?`,
+          warning: "Embedded scripts on that domain will stop serving dynamic meta tags and structured schema.",
+          icon: "🗑️",
+          confirmText: "Yes, Remove Website",
+          confirmClass: "danger",
+        });
+        if (!confirmed) return;
 
         deleteBtn.disabled = true;
         deleteBtn.textContent = "Removing...";
@@ -2606,16 +2682,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (clearChatBtn) {
-      clearChatBtn.addEventListener("click", () => {
-        if (confirm("Clear messages in this conversation?")) {
-          const container = document.getElementById("chat-messages-container");
-          const emptyState = document.getElementById("chat-empty-state");
-          if (container) {
-            container.innerHTML = "";
-            if (emptyState) container.appendChild(emptyState);
-          }
-          chatMessagesHistory = [];
+      clearChatBtn.addEventListener("click", async () => {
+        const confirmed = await showAppConfirm({
+          title: "Clear Conversation?",
+          subtitle: "AI Copilot Memory Reset",
+          message: "Are you sure you want to clear messages in this active conversation?",
+          icon: "🧹",
+          confirmText: "Clear Messages",
+          confirmClass: "danger",
+        });
+        if (!confirmed) return;
+
+        const container = document.getElementById("chat-messages-container");
+        const emptyState = document.getElementById("chat-empty-state");
+        if (container) {
+          container.innerHTML = "";
+          if (emptyState) container.appendChild(emptyState);
         }
+        chatMessagesHistory = [];
       });
     }
 
@@ -2861,14 +2945,23 @@ document.addEventListener("DOMContentLoaded", () => {
               e.stopPropagation();
               const sid = btn.getAttribute("data-id");
               if (!sid) return;
-              if (confirm("Delete this conversation?")) {
-                await authFetch(`${CHAT_API_BASE}/api/chat/sessions/${sid}`, { method: "DELETE" }).catch(() => {});
-                if (sid === currentSessionId) {
-                  currentSessionId = "";
-                  localStorage.removeItem("career_digest_active_session");
-                }
-                loadChatSessions();
+
+              const confirmed = await showAppConfirm({
+                title: "Delete Conversation?",
+                subtitle: "Chat Session Deletion",
+                message: "Are you sure you want to delete this chat session permanently?",
+                icon: "🗑️",
+                confirmText: "Delete Chat",
+                confirmClass: "danger",
+              });
+              if (!confirmed) return;
+
+              await authFetch(`${CHAT_API_BASE}/api/chat/sessions/${sid}`, { method: "DELETE" }).catch(() => {});
+              if (sid === currentSessionId) {
+                currentSessionId = "";
+                localStorage.removeItem("career_digest_active_session");
               }
+              loadChatSessions();
             });
           });
         }
@@ -3791,11 +3884,45 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
+    // Dedicated Logout Confirmation Modal Elements & Logic
+    const logoutConfirmModal = document.getElementById("logout-confirm-modal");
+    const closeLogoutModalBtn = document.getElementById("close-logout-modal-btn");
+    const cancelLogoutModalBtn = document.getElementById("cancel-logout-modal-btn");
+    const confirmLogoutModalBtn = document.getElementById("confirm-logout-modal-btn");
+    const logoutEmailDisplay = document.getElementById("logout-user-email-display");
+
+    function openLogoutModal() {
+      if (logoutEmailDisplay) {
+        logoutEmailDisplay.textContent = currentAuthUser?.email || "abhishektiwari1540@gmail.com";
+      }
+      if (logoutConfirmModal) {
+        logoutConfirmModal.style.display = "flex";
+      }
+    }
+
+    function closeLogoutModal() {
+      if (logoutConfirmModal) {
+        logoutConfirmModal.style.display = "none";
+      }
+    }
+
     if (logoutBtn) {
       logoutBtn.onclick = () => {
-        if (confirm("Sign out of Career-Digest?")) {
-          logoutUser(true);
-        }
+        openLogoutModal();
+      };
+    }
+
+    if (closeLogoutModalBtn) closeLogoutModalBtn.onclick = closeLogoutModal;
+    if (cancelLogoutModalBtn) cancelLogoutModalBtn.onclick = closeLogoutModal;
+    if (logoutConfirmModal) {
+      logoutConfirmModal.onclick = (e) => {
+        if (e.target === logoutConfirmModal) closeLogoutModal();
+      };
+    }
+    if (confirmLogoutModalBtn) {
+      confirmLogoutModalBtn.onclick = () => {
+        closeLogoutModal();
+        logoutUser(true);
       };
     }
 
@@ -4074,17 +4201,25 @@ document.addEventListener("DOMContentLoaded", () => {
           document.querySelectorAll(".reject-request-btn").forEach((btn) => {
             btn.onclick = async () => {
               const reqId = btn.dataset.reqId;
-              if (confirm("Decline this activation request?")) {
-                await fetch("/api/admin/reject-request", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${currentAuthToken}`,
-                  },
-                  body: JSON.stringify({ requestId: reqId, reason: "Declined by owner" }),
-                });
-                loadAdminTelemetryTab();
-              }
+              const confirmed = await showAppConfirm({
+                title: "Decline Activation Request?",
+                subtitle: "Instance Security Gatekeeper",
+                message: "Are you sure you want to decline this cloned instance activation request?",
+                icon: "🚫",
+                confirmText: "Decline Request",
+                confirmClass: "danger",
+              });
+              if (!confirmed) return;
+
+              await fetch("/api/admin/reject-request", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${currentAuthToken}`,
+                },
+                body: JSON.stringify({ requestId: reqId, reason: "Declined by owner" }),
+              });
+              loadAdminTelemetryTab();
             };
           });
         }
@@ -4132,18 +4267,26 @@ document.addEventListener("DOMContentLoaded", () => {
           document.querySelectorAll(".revoke-instance-btn").forEach((btn) => {
             btn.onclick = async () => {
               const instId = btn.dataset.instId;
-              if (confirm(`Kill-Switch: Revoke license for node ${instId}? The cloner will immediately lose all access to AI and search endpoints.`)) {
-                await fetch("/api/admin/revoke-instance", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${currentAuthToken}`,
-                  },
-                  body: JSON.stringify({ instanceId: instId, reason: "Revoked by Abhishek Tiwari" }),
-                });
-                alert(`🛑 Node ${instId} has been revoked!`);
-                loadAdminTelemetryTab();
-              }
+              const confirmed = await showAppConfirm({
+                title: "Kill-Switch: Revoke License?",
+                subtitle: "Instant Remote Revocation",
+                message: `Are you sure you want to revoke license for node ${instId}?`,
+                warning: "The cloner will immediately lose all access to AI and search endpoints.",
+                icon: "⚡",
+                confirmText: "Revoke License Now",
+                confirmClass: "danger",
+              });
+              if (!confirmed) return;
+
+              await fetch("/api/admin/revoke-instance", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${currentAuthToken}`,
+                },
+                body: JSON.stringify({ instanceId: instId, reason: "Revoked by Abhishek Tiwari" }),
+              });
+              loadAdminTelemetryTab();
             };
           });
         }
