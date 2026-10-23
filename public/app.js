@@ -10,6 +10,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   let sessionDataStarted = false;
 
+  // Central Authenticated Request Wrapper (Scopes all user data, uploads, chats, websites & stats)
+  function authFetch(url, options = {}) {
+    const opts = { ...options };
+    const headers = new Headers(opts.headers || {});
+    if (currentAuthToken && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${currentAuthToken}`);
+    }
+    if (currentAuthUser) {
+      if (currentAuthUser.id && !headers.has("X-User-Id")) {
+        headers.set("X-User-Id", currentAuthUser.id);
+      }
+      if (currentAuthUser.email && !headers.has("X-User-Email")) {
+        headers.set("X-User-Email", currentAuthUser.email);
+      }
+    }
+    opts.headers = headers;
+    return fetch(url, opts);
+  }
+
   // Global State
   let activeTab = "tab-chat";
   let cachedMemories = [];
@@ -149,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
         progressPercent.textContent = "65%";
         progressStatusText.textContent = "Saving into Supabase & generating gemini-embedding-2 vectors...";
 
-        const response = await fetch("/api/upload", {
+        const response = await authFetch("/api/upload", {
           method: "POST",
           body: formData,
         });
@@ -224,7 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
     searchResultsArea.style.display = "block";
 
     try {
-      const res = await fetch("/api/search", {
+      const res = await authFetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query }),
@@ -293,7 +312,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (cachedMemories.length === 0 && cachedLinkedIn.length === 0) {
       memoriesContainer.innerHTML = "<p class='placeholder-text'>Loading ingested brain items...</p>";
       try {
-        const res = await fetch("/api/memories");
+        const res = await authFetch("/api/memories");
         const data = await res.json();
         if (data.success) {
           cachedMemories = data.memories || [];
@@ -804,7 +823,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!container) return;
 
     try {
-      const res = await fetch("/api/reading-stats");
+      const res = await authFetch("/api/reading-stats");
       const data = await res.json();
 
       if (data.success && data.stats) {
@@ -939,7 +958,7 @@ document.addEventListener("DOMContentLoaded", () => {
       completeReadBtn.textContent = "⏳ Saving to Database...";
 
       try {
-        const res = await fetch("/api/track-reading", {
+        const res = await authFetch("/api/track-reading", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1148,7 +1167,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Dashboard Stats Fetching
   async function fetchStats() {
     try {
-      const res = await fetch("/api/stats");
+      const res = await authFetch("/api/stats");
       const data = await res.json();
       if (data.success) {
         document.getElementById("stat-linkedin-posts").textContent = data.stats.linkedInPostsCount;
@@ -1196,9 +1215,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!selector) return;
 
     try {
-      const headers = {};
-      if (currentAuthToken) headers["Authorization"] = `Bearer ${currentAuthToken}`;
-      const res = await fetch("/api/seo/websites", { headers });
+      const res = await authFetch("/api/seo/websites");
       const data = await res.json();
 
       if (data.success && Array.isArray(data.websites) && data.websites.length > 0) {
@@ -1430,12 +1447,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (modalError) modalError.style.display = "none";
 
         try {
-          const headers = { "Content-Type": "application/json" };
-          if (currentAuthToken) headers["Authorization"] = `Bearer ${currentAuthToken}`;
-
-          const res = await fetch("/api/seo/websites", {
+          const res = await authFetch("/api/seo/websites", {
             method: "POST",
-            headers,
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               siteName,
               siteUrl,
@@ -1478,12 +1492,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       try {
-        const headers = { "Content-Type": "application/json" };
-        if (currentAuthToken) headers["Authorization"] = `Bearer ${currentAuthToken}`;
-
-        const res = await fetch(`/api/seo/websites/${currentActiveWebsiteId}/generate`, {
+        const res = await authFetch(`/api/seo/websites/${currentActiveWebsiteId}/generate`, {
           method: "POST",
-          headers,
+          headers: { "Content-Type": "application/json" },
         });
         const data = await res.json();
 
@@ -1538,12 +1549,8 @@ document.addEventListener("DOMContentLoaded", () => {
         deleteBtn.textContent = "Removing...";
 
         try {
-          const headers = {};
-          if (currentAuthToken) headers["Authorization"] = `Bearer ${currentAuthToken}`;
-
-          const res = await fetch(`/api/seo/websites/${currentActiveWebsiteId}`, {
+          const res = await authFetch(`/api/seo/websites/${currentActiveWebsiteId}`, {
             method: "DELETE",
-            headers,
           });
           const data = await res.json();
 
@@ -2744,7 +2751,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const formData = new FormData();
           formData.append("file", file);
 
-          const res = await fetch(`${CHAT_API_BASE}/api/chat/upload`, {
+          const res = await authFetch(`${CHAT_API_BASE}/api/chat/upload`, {
             method: "POST",
             body: formData,
           });
@@ -2810,7 +2817,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-      const res = await fetch(`${CHAT_API_BASE}/api/chat/sessions`, {
+      const res = await authFetch(`${CHAT_API_BASE}/api/chat/sessions`, {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -2855,7 +2862,7 @@ document.addEventListener("DOMContentLoaded", () => {
               const sid = btn.getAttribute("data-id");
               if (!sid) return;
               if (confirm("Delete this conversation?")) {
-                await fetch(`${CHAT_API_BASE}/api/chat/sessions/${sid}`, { method: "DELETE" }).catch(() => {});
+                await authFetch(`${CHAT_API_BASE}/api/chat/sessions/${sid}`, { method: "DELETE" }).catch(() => {});
                 if (sid === currentSessionId) {
                   currentSessionId = "";
                   localStorage.removeItem("career_digest_active_session");
@@ -2902,7 +2909,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatTitle = document.getElementById("current-chat-title");
 
     try {
-      const res = await fetch(`${CHAT_API_BASE}/api/chat/sessions/${sessionId}/messages`);
+      const res = await authFetch(`${CHAT_API_BASE}/api/chat/sessions/${sessionId}/messages`);
       const data = await res.json();
 
       if (data.success && Array.isArray(data.messages)) {
@@ -2948,7 +2955,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Create New Chat
   async function handleCreateNewChat(selectAfter = true) {
     try {
-      const res = await fetch(`${CHAT_API_BASE}/api/chat/sessions`, {
+      const res = await authFetch(`${CHAT_API_BASE}/api/chat/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3059,7 +3066,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      const res = await fetch(`${CHAT_API_BASE}/api/chat/message`, {
+      const res = await authFetch(`${CHAT_API_BASE}/api/chat/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

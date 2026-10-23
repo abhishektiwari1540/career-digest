@@ -16,6 +16,7 @@ export interface WebsitePageSeo {
 
 export interface UserWebsite {
   id: string; // e.g. site_abhishek_portfolio, site_1792...
+  user_id?: string; // Associated User ID (e.g. usr_root_abhishektiwari)
   owner_email: string;
   site_name: string;
   site_url: string; // e.g. https://www.abhishektiwari.online/
@@ -39,6 +40,7 @@ export async function initDefaultWebsites() {
   if (!memoryWebsites.has(defaultSiteId)) {
     const defaultSite: UserWebsite = {
       id: defaultSiteId,
+      user_id: "usr_root_abhishektiwari",
       owner_email: rootEmail,
       site_name: "Abhishek Tiwari - Portfolio & Second Brain",
       site_url: "https://www.abhishektiwari.online/",
@@ -111,23 +113,30 @@ export async function initDefaultWebsites() {
 /**
  * List all websites owned by user (or all websites if projectadmin)
  */
-export async function getUserWebsites(userEmail: string, role?: string): Promise<UserWebsite[]> {
+export async function getUserWebsites(userEmail: string, role?: string, userId?: string): Promise<UserWebsite[]> {
   await initDefaultWebsites();
 
   const normalizedEmail = (userEmail || "").trim().toLowerCase();
+  const targetUserId = userId || (normalizedEmail === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : undefined);
   
   // Try fetching from Supabase
   try {
     let query = supabase.from("user_websites").select("*").order("created_at", { ascending: false });
     if (role !== "projectadmin" && normalizedEmail !== "abhishektiwari1540@gmail.com") {
-      query = query.eq("owner_email", normalizedEmail);
+      if (targetUserId) {
+        query = query.or(`owner_email.eq.${normalizedEmail},user_id.eq.${targetUserId}`);
+      } else {
+        query = query.eq("owner_email", normalizedEmail);
+      }
     }
     const { data, error } = await query;
     if (!error && data && data.length > 0) {
       // Sync into memory cache
       data.forEach((row: any) => {
+        const uId = row.user_id || (row.owner_email === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : undefined);
         memoryWebsites.set(row.id, {
           id: row.id,
+          user_id: uId,
           owner_email: row.owner_email,
           site_name: row.site_name,
           site_url: row.site_url,
@@ -146,7 +155,10 @@ export async function getUserWebsites(userEmail: string, role?: string): Promise
     return all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
-  return all.filter((w) => w.owner_email.toLowerCase() === normalizedEmail);
+  return all.filter((w) => {
+    if (targetUserId && w.user_id === targetUserId) return true;
+    return w.owner_email.toLowerCase() === normalizedEmail;
+  });
 }
 
 /**
@@ -191,11 +203,13 @@ export async function addUserWebsite(
     siteUrl: string;
     siteDescription?: string;
     targetKeywords?: string[];
-  }
+  },
+  userId?: string
 ): Promise<UserWebsite> {
   await initDefaultWebsites();
 
   const normalizedEmail = (ownerEmail || "").trim().toLowerCase();
+  const assignedUserId = userId || (normalizedEmail === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : `usr_${Date.now()}`);
   let cleanUrl = (data.siteUrl || "").trim();
   if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
     cleanUrl = "https://" + cleanUrl;
@@ -266,6 +280,7 @@ export async function addUserWebsite(
 
   const newWebsite: UserWebsite = {
     id: siteId,
+    user_id: assignedUserId,
     owner_email: normalizedEmail,
     site_name: siteName,
     site_url: cleanUrl,
@@ -278,10 +293,11 @@ export async function addUserWebsite(
 
   memoryWebsites.set(siteId, newWebsite);
 
-  // Save to Supabase
+  // Save to Supabase (attempt with user_id, fallback without if column missing)
   try {
-    await supabase.from("user_websites").insert({
+    const { error } = await supabase.from("user_websites").insert({
       id: siteId,
+      user_id: assignedUserId,
       owner_email: normalizedEmail,
       site_name: siteName,
       site_url: cleanUrl,
@@ -291,6 +307,20 @@ export async function addUserWebsite(
       created_at: newWebsite.created_at,
       updated_at: newWebsite.updated_at,
     });
+    if (error && error.message?.includes("user_id")) {
+      // Column might not exist in remote Supabase table yet, insert without user_id
+      await supabase.from("user_websites").insert({
+        id: siteId,
+        owner_email: normalizedEmail,
+        site_name: siteName,
+        site_url: cleanUrl,
+        site_description: siteDesc,
+        target_keywords: keywords,
+        pages_seo: pagesSeo,
+        created_at: newWebsite.created_at,
+        updated_at: newWebsite.updated_at,
+      });
+    }
   } catch (err: any) {
     console.warn("[userWebsites] Supabase insert notice:", err.message);
   }

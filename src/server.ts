@@ -45,6 +45,7 @@ import { XPublisher } from "./publishers/xPublisher.js";
 import { RedditPublisher } from "./publishers/redditPublisher.js";
 import { MetaGraphPublisher } from "./publishers/metaGraph.js";
 import {
+  fetchMultimodalVectors,
   fetchRecentLinkedInPosts,
   fetchSecondBrainMemories,
   fetchSeoMetadataRecords,
@@ -133,13 +134,58 @@ app.use(express.json());
 // Enable CORS globally for all /api endpoints (allows https://www.abhishektiwari.online to fetch blogs, SEO, and stats directly)
 app.use("/api", (req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-second-brain-secret, Accept");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE, PUT");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-second-brain-secret, x-user-id, x-user-email, Accept");
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
   next();
 });
+
+export interface AuthenticatedUserContext {
+  userId: string;
+  email: string;
+  role: string;
+  isRootOwner: boolean;
+}
+
+/**
+ * Extract authenticated user context from Bearer JWT token or custom headers
+ */
+export function getAuthUser(req: express.Request): AuthenticatedUserContext | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    const verified = verifyAuthToken(token);
+    if (verified.valid && verified.user) {
+      const email = (verified.user.email || "").trim().toLowerCase();
+      const isRoot = verified.user.role === "projectadmin" || email === "abhishektiwari1540@gmail.com";
+      const uId = verified.user.id || (isRoot ? "usr_root_abhishektiwari" : `usr_${email.replace(/[^a-zA-Z0-9]/g, "_")}`);
+      return {
+        userId: uId,
+        email,
+        role: verified.user.role || (isRoot ? "projectadmin" : "engineer"),
+        isRootOwner: isRoot,
+      };
+    }
+  }
+
+  // Also check request headers (useful for internal requests / scripts)
+  const headerUserId = req.headers["x-user-id"] as string;
+  const headerEmail = (req.headers["x-user-email"] as string || "").trim().toLowerCase();
+  if (headerUserId || headerEmail) {
+    const email = headerEmail || "abhishektiwari1540@gmail.com";
+    const isRoot = email === "abhishektiwari1540@gmail.com";
+    return {
+      userId: headerUserId || (isRoot ? "usr_root_abhishektiwari" : `usr_${email.replace(/[^a-zA-Z0-9]/g, "_")}`),
+      email,
+      role: isRoot ? "projectadmin" : "engineer",
+      isRootOwner: isRoot,
+    };
+  }
+
+  return null;
+}
 
 // Security Middleware 1: Enforce NOINDEX on private Second Brain App
 app.use((req, res, next) => {
@@ -264,11 +310,29 @@ function splitCsvLine(line: string): string[] {
 // GET /api/stats - Second Brain Metrics Dashboard
 app.get("/api/stats", async (req, res) => {
   try {
-    const [linkedInRes, memoryRes, vectorRes] = await Promise.all([
-      supabase.from("linkedin_posts").select("id", { count: "exact", head: true }),
-      supabase.from("second_brain_memory").select("id", { count: "exact", head: true }),
-      supabase.from("multimodal_vectors").select("id", { count: "exact", head: true }),
-    ]);
+    const authUser = getAuthUser(req);
+    const isRoot = !authUser || authUser.isRootOwner;
+
+    let linkedInPostsCount = 0;
+    let secondBrainItemsCount = 0;
+    let multimodalVectorsCount = 0;
+
+    if (isRoot) {
+      const [linkedInRes, memoryRes, vectorRes] = await Promise.all([
+        supabase.from("linkedin_posts").select("id", { count: "exact", head: true }),
+        supabase.from("second_brain_memory").select("id", { count: "exact", head: true }),
+        supabase.from("multimodal_vectors").select("id", { count: "exact", head: true }),
+      ]);
+      linkedInPostsCount = linkedInRes.count || 0;
+      secondBrainItemsCount = memoryRes.count || 0;
+      multimodalVectorsCount = vectorRes.count || 0;
+    } else {
+      const memories = await fetchSecondBrainMemories(authUser.userId, authUser.email, authUser.role);
+      const vectors = await fetchMultimodalVectors(undefined, authUser.userId, authUser.email, authUser.role);
+      secondBrainItemsCount = memories.length;
+      multimodalVectorsCount = vectors.length;
+      linkedInPostsCount = 0;
+    }
 
     const publishersStatus = [
       {
@@ -358,10 +422,10 @@ app.get("/api/stats", async (req, res) => {
     res.json({
       success: true,
       stats: {
-        linkedInPostsCount: linkedInRes.count || 0,
-        secondBrainItemsCount: memoryRes.count || 0,
-        multimodalVectorsCount: vectorRes.count || 0,
-        candidateName: config.candidateName,
+        linkedInPostsCount,
+        secondBrainItemsCount,
+        multimodalVectorsCount,
+        candidateName: isRoot ? config.candidateName : (authUser?.email || "Community User"),
         publishersStatus,
       },
     });
@@ -373,9 +437,12 @@ app.get("/api/stats", async (req, res) => {
 // GET /api/memories - Fetch Ingested Memories & LinkedIn Posts
 app.get("/api/memories", async (req, res) => {
   try {
+    const authUser = getAuthUser(req);
+    const isRoot = !authUser || authUser.isRootOwner;
+
     const [memories, linkedInPosts] = await Promise.all([
-      fetchSecondBrainMemories(),
-      fetchRecentLinkedInPosts(15),
+      fetchSecondBrainMemories(authUser?.userId, authUser?.email, authUser?.role),
+      isRoot ? fetchRecentLinkedInPosts(15) : Promise.resolve([]),
     ]);
 
     res.json({
@@ -391,6 +458,7 @@ app.get("/api/memories", async (req, res) => {
 // POST /api/upload - Ingest Data File (LinkedIn CSV, Google Chat JSON/TXT, Resume PDF/TXT, Research Notes)
 app.post("/api/upload", upload.single("file"), async (req, res) => {
   try {
+    const authUser = getAuthUser(req);
     const file = req.file;
     const category = (req.body.category || "auto").toLowerCase();
 
@@ -409,7 +477,7 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
 
     // Parse according to extension & detected category
     if (fileExt === ".zip") {
-      const zipResult = await processLinkedInZipArchive(buffer, fileName);
+      const zipResult = await processLinkedInZipArchive(buffer, fileName, authUser?.userId, authUser?.email);
       return res.json({
         success: true,
         message: `Successfully processed full LinkedIn Data Export ZIP archive "${fileName}"!`,
@@ -572,14 +640,23 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
           category: item.category,
           conceptKey: item.key,
           memoryText: item.text,
+          userId: authUser?.userId,
+          userEmail: authUser?.email,
         });
 
         // 2. Generate gemini-embedding-2 Multimodal Vector Embedding
         const vector = await generateMultimodalEmbedding(item.text);
-        await saveMultimodalVector(item.key, item.category, vector, {
-          fileName,
-          ingestedAt: new Date().toISOString(),
-        });
+        await saveMultimodalVector(
+          item.key,
+          item.category,
+          vector,
+          {
+            fileName,
+            ingestedAt: new Date().toISOString(),
+          },
+          authUser?.userId,
+          authUser?.email
+        );
         vectorsGeneratedCount++;
       } catch (err: any) {
         console.warn("[server] Item processing warning:", err.message);
@@ -1021,7 +1098,7 @@ app.get("/api/seo/websites", async (req, res) => {
       return res.status(401).json({ success: false, error: "Invalid token" });
     }
 
-    const sites = await getUserWebsites(verified.user.email, verified.user.role);
+    const sites = await getUserWebsites(verified.user.email, verified.user.role, verified.user.id);
     res.json({ success: true, websites: sites });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1046,12 +1123,16 @@ app.post("/api/seo/websites", async (req, res) => {
       return res.status(400).json({ success: false, error: "Website Name and Website URL are required." });
     }
 
-    const newSite = await addUserWebsite(verified.user.email, {
-      siteName,
-      siteUrl,
-      siteDescription,
-      targetKeywords: Array.isArray(targetKeywords) ? targetKeywords : undefined,
-    });
+    const newSite = await addUserWebsite(
+      verified.user.email,
+      {
+        siteName,
+        siteUrl,
+        siteDescription,
+        targetKeywords: Array.isArray(targetKeywords) ? targetKeywords : undefined,
+      },
+      verified.user.id
+    );
 
     res.json({ success: true, website: newSite, message: `Website ${newSite.site_name} added successfully!` });
   } catch (err: any) {
@@ -1116,6 +1197,7 @@ app.post("/api/google-search", async (req, res) => {
 // POST /api/track-reading - Record reading time & interaction in database
 app.post("/api/track-reading", async (req, res) => {
   try {
+    const authUser = getAuthUser(req);
     const { articleTitle, url, topicCategory, readingTimeSeconds } = req.body;
     if (!articleTitle) {
       return res.status(400).json({ success: false, error: "articleTitle is required" });
@@ -1125,8 +1207,10 @@ app.post("/api/track-reading", async (req, res) => {
       url,
       topicCategory,
       readingTimeSeconds: Number(readingTimeSeconds) || 60,
+      userId: authUser?.userId,
+      userEmail: authUser?.email,
     });
-    const stats = await getUserReadingStats();
+    const stats = await getUserReadingStats(authUser?.userId, authUser?.email, authUser?.role);
     res.json({ success: true, logEntry, stats });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1136,7 +1220,8 @@ app.post("/api/track-reading", async (req, res) => {
 // GET /api/reading-stats - Retrieve user reading statistics
 app.get("/api/reading-stats", async (req, res) => {
   try {
-    const stats = await getUserReadingStats();
+    const authUser = getAuthUser(req);
+    const stats = await getUserReadingStats(authUser?.userId, authUser?.email, authUser?.role);
     res.json({ success: true, stats });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1471,7 +1556,8 @@ app.post("/api/self-update/toggle", (req, res) => {
 // GET /api/chat/sessions - Fetch all chat conversation sessions
 app.get("/api/chat/sessions", async (req, res) => {
   try {
-    const sessions = await getChatSessions();
+    const authUser = getAuthUser(req);
+    const sessions = await getChatSessions(authUser?.userId, authUser?.email, authUser?.role);
     res.json({ success: true, sessions });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1481,8 +1567,9 @@ app.get("/api/chat/sessions", async (req, res) => {
 // POST /api/chat/sessions - Create new chat session
 app.post("/api/chat/sessions", async (req, res) => {
   try {
+    const authUser = getAuthUser(req);
     const { title, presetMode } = req.body;
-    const session = await createChatSession(title, presetMode);
+    const session = await createChatSession(title, presetMode, authUser?.userId, authUser?.email);
     res.json({ success: true, session });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

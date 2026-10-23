@@ -218,23 +218,86 @@ export async function saveContentPack(pack: {
   }
 }
 
-export async function fetchSecondBrainMemories(): Promise<Array<{ category: string; conceptKey: string; memoryText: string }>> {
-  try {
-    const { data, error } = await supabase
-      .from("second_brain_memory")
-      .select("category, concept_key, memory_text")
-      .order("created_at", { ascending: false })
-      .limit(50);
+export interface SecondBrainMemoryRecord {
+  category: string;
+  conceptKey: string;
+  memoryText: string;
+  user_id?: string;
+  user_email?: string;
+  platform?: string;
+  postText?: string;
+  performanceScore?: number;
+}
 
-    if (error || !data) return [];
-    return data.map((d) => ({
-      category: d.category,
-      conceptKey: d.concept_key,
-      memoryText: d.memory_text,
-    }));
+const inMemoryMemories: SecondBrainMemoryRecord[] = [];
+
+export async function fetchSecondBrainMemories(
+  userId?: string,
+  userEmail?: string,
+  role?: string
+): Promise<Array<{ category: string; conceptKey: string; memoryText: string }>> {
+  const isRoot = role === "projectadmin" || userEmail === "abhishektiwari1540@gmail.com";
+  const normalizedEmail = (userEmail || "").trim().toLowerCase();
+
+  try {
+    let query = supabase
+      .from("second_brain_memory")
+      .select("category, concept_key, memory_text, user_id, user_email")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    const { data, error } = await query;
+    if (!error && data && data.length > 0) {
+      const records = data.map((d: any) => ({
+        category: d.category,
+        conceptKey: d.concept_key,
+        memoryText: d.memory_text,
+        user_id: d.user_id || "usr_root_abhishektiwari",
+        user_email: d.user_email || "abhishektiwari1540@gmail.com",
+      }));
+
+      // Cache into in-memory store
+      records.forEach((r) => {
+        if (!inMemoryMemories.some((m) => m.conceptKey === r.conceptKey)) {
+          inMemoryMemories.push(r);
+        }
+      });
+
+      if (isRoot || (!userId && !normalizedEmail)) {
+        return records.map((r) => ({
+          category: r.category,
+          conceptKey: r.conceptKey,
+          memoryText: r.memoryText,
+        }));
+      }
+
+      return records
+        .filter((r) => (userId && r.user_id === userId) || (normalizedEmail && r.user_email === normalizedEmail))
+        .map((r) => ({
+          category: r.category,
+          conceptKey: r.conceptKey,
+          memoryText: r.memoryText,
+        }));
+    }
   } catch {
-    return [];
+    // fallback to in-memory
   }
+
+  if (isRoot || (!userId && !normalizedEmail)) {
+    return inMemoryMemories.map((m) => ({
+      category: m.category,
+      conceptKey: m.conceptKey,
+      memoryText: m.memoryText,
+    }));
+  }
+
+  return inMemoryMemories
+    .filter((m) => (userId && m.user_id === userId) || (normalizedEmail && m.user_email === normalizedEmail))
+    .map((m) => ({
+      category: m.category,
+      conceptKey: m.conceptKey,
+      memoryText: m.memoryText,
+    }));
 }
 
 export async function saveSecondBrainMemory(memory: {
@@ -244,7 +307,30 @@ export async function saveSecondBrainMemory(memory: {
   platform?: string;
   postText?: string;
   performanceScore?: number;
+  userId?: string;
+  userEmail?: string;
 }) {
+  const normalizedEmail = (memory.userEmail || "abhishektiwari1540@gmail.com").trim().toLowerCase();
+  const assignedUserId = memory.userId || (normalizedEmail === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : `usr_${Date.now()}`);
+
+  const record: SecondBrainMemoryRecord = {
+    category: memory.category,
+    conceptKey: memory.conceptKey,
+    memoryText: memory.memoryText,
+    user_id: assignedUserId,
+    user_email: normalizedEmail,
+    platform: memory.platform || "linkedin",
+    postText: memory.postText || memory.memoryText,
+    performanceScore: memory.performanceScore ?? 0.8,
+  };
+
+  const existingIdx = inMemoryMemories.findIndex((m) => m.conceptKey === memory.conceptKey);
+  if (existingIdx >= 0) {
+    inMemoryMemories[existingIdx] = record;
+  } else {
+    inMemoryMemories.unshift(record);
+  }
+
   try {
     const { error } = await supabase.from("second_brain_memory").upsert(
       {
@@ -254,14 +340,31 @@ export async function saveSecondBrainMemory(memory: {
         platform: memory.platform || "linkedin",
         post_text: memory.postText || memory.memoryText,
         performance_score: memory.performanceScore ?? 0.8,
+        user_id: assignedUserId,
+        user_email: normalizedEmail,
       },
       { onConflict: "concept_key" }
     );
     if (error) {
-      console.warn("[supabase] second_brain_memory upsert warning:", error.message);
+      if (error.message?.includes("user_id") || error.message?.includes("user_email")) {
+        // Fallback without user_id if table doesn't have these columns yet
+        await supabase.from("second_brain_memory").upsert(
+          {
+            category: memory.category,
+            concept_key: memory.conceptKey,
+            memory_text: memory.memoryText,
+            platform: memory.platform || "linkedin",
+            post_text: memory.postText || memory.memoryText,
+            performance_score: memory.performanceScore ?? 0.8,
+          },
+          { onConflict: "concept_key" }
+        );
+      } else {
+        console.warn("[supabase] second_brain_memory upsert notice:", error.message);
+      }
     }
   } catch (err: any) {
-    console.warn("[supabase] second_brain_memory save failed:", err.message);
+    console.warn("[supabase] second_brain_memory save failed (used in-memory store):", err.message);
   }
 }
 
@@ -340,7 +443,12 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-export async function fetchMultimodalVectors(contentType?: string): Promise<Array<{
+export async function fetchMultimodalVectors(
+  contentType?: string,
+  userId?: string,
+  userEmail?: string,
+  role?: string
+): Promise<Array<{
   concept_key: string;
   content_type: string;
   embedding_vector: number[];
@@ -353,25 +461,57 @@ export async function fetchMultimodalVectors(contentType?: string): Promise<Arra
     }
     const { data, error } = await query.order("created_at", { ascending: false }).limit(200);
     if (error || !data) return [];
-    return data.map((d: any) => ({
+    
+    const isRoot = role === "projectadmin" || userEmail === "abhishektiwari1540@gmail.com";
+    const mapped = data.map((d: any) => ({
       concept_key: d.concept_key,
       content_type: d.content_type,
       embedding_vector: typeof d.embedding_vector === "string" ? JSON.parse(d.embedding_vector) : d.embedding_vector,
       metadata: d.metadata || {},
     }));
+
+    if (isRoot || (!userId && !userEmail)) {
+      return mapped;
+    }
+
+    // Scoped filtering: new data matches user_id or user_email; old data belongs to root owner Abhishek
+    return mapped.filter((item) => {
+      const itemUserId = item.metadata?.user_id;
+      const itemEmail = (item.metadata?.user_email || "").toLowerCase();
+      if (itemUserId && userId && itemUserId === userId) return true;
+      if (itemEmail && userEmail && itemEmail === userEmail.toLowerCase()) return true;
+      return false;
+    });
   } catch (err: any) {
     console.warn("[supabase] fetchMultimodalVectors warning:", err.message);
     return [];
   }
 }
 
-export async function saveMultimodalVector(conceptKey: string, contentType: string, vector: number[], metadata: any = {}) {
+export async function saveMultimodalVector(
+  conceptKey: string,
+  contentType: string,
+  vector: number[],
+  metadata: any = {},
+  userId?: string,
+  userEmail?: string
+) {
+  const normalizedEmail = (userEmail || "abhishektiwari1540@gmail.com").trim().toLowerCase();
+  const assignedUserId = userId || (normalizedEmail === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : `usr_${Date.now()}`);
+
+  const enrichedMetadata = {
+    ...metadata,
+    user_id: assignedUserId,
+    user_email: normalizedEmail,
+    saved_at: new Date().toISOString(),
+  };
+
   try {
     const { error } = await supabase.from("multimodal_vectors").insert({
       concept_key: conceptKey,
       content_type: contentType,
       embedding_vector: JSON.stringify(vector),
-      metadata,
+      metadata: enrichedMetadata,
     });
     if (error) {
       console.warn("[supabase] multimodal_vectors insert warning:", error.message);
@@ -402,6 +542,8 @@ export async function saveAudioBriefing(reportDate: string, audioUrl: string, du
 // In-Memory fallback for reading logs
 export interface UserReadingLog {
   id?: string;
+  user_id?: string;
+  user_email?: string;
   article_title: string;
   url?: string;
   topic_category: string;
@@ -416,9 +558,16 @@ export async function recordUserReadingLog(log: {
   url?: string;
   topicCategory: string;
   readingTimeSeconds: number;
+  userId?: string;
+  userEmail?: string;
 }): Promise<UserReadingLog> {
+  const normalizedEmail = (log.userEmail || "abhishektiwari1540@gmail.com").trim().toLowerCase();
+  const assignedUserId = log.userId || (normalizedEmail === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : `usr_${Date.now()}`);
+
   const entry: UserReadingLog = {
     id: `read_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    user_id: assignedUserId,
+    user_email: normalizedEmail,
     article_title: log.articleTitle,
     url: log.url || "",
     topic_category: log.topicCategory || "Tech Reading",
@@ -430,6 +579,8 @@ export async function recordUserReadingLog(log: {
 
   try {
     const { data, error } = await supabase.from("user_reading_logs").insert({
+      user_id: entry.user_id,
+      user_email: entry.user_email,
       article_title: entry.article_title,
       url: entry.url,
       topic_category: entry.topic_category,
@@ -440,6 +591,15 @@ export async function recordUserReadingLog(log: {
     if (!error && data) {
       return data as UserReadingLog;
     }
+    if (error && (error.message?.includes("user_id") || error.message?.includes("user_email"))) {
+      await supabase.from("user_reading_logs").insert({
+        article_title: entry.article_title,
+        url: entry.url,
+        topic_category: entry.topic_category,
+        reading_time_seconds: entry.reading_time_seconds,
+        read_at: entry.read_at,
+      });
+    }
   } catch (err: any) {
     console.warn("[supabase] user_reading_logs table notice (used in-memory store):", err.message);
   }
@@ -447,14 +607,30 @@ export async function recordUserReadingLog(log: {
   return entry;
 }
 
-export async function fetchUserReadingLogs(limit = 20): Promise<UserReadingLog[]> {
+export async function fetchUserReadingLogs(
+  limit = 20,
+  userId?: string,
+  userEmail?: string,
+  role?: string
+): Promise<UserReadingLog[]> {
+  const isRoot = role === "projectadmin" || userEmail === "abhishektiwari1540@gmail.com";
+  const normalizedEmail = (userEmail || "").trim().toLowerCase();
+
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("user_reading_logs")
       .select("*")
-      .order("read_at", { ascending: false })
-      .limit(limit);
+      .order("read_at", { ascending: false });
 
+    if (!isRoot && (userId || normalizedEmail)) {
+      if (userId) {
+        query = query.or(`user_id.eq.${userId},user_email.eq.${normalizedEmail}`);
+      } else {
+        query = query.eq("user_email", normalizedEmail);
+      }
+    }
+
+    const { data, error } = await query.limit(limit);
     if (!error && data && data.length > 0) {
       return data as UserReadingLog[];
     }
@@ -462,11 +638,21 @@ export async function fetchUserReadingLogs(limit = 20): Promise<UserReadingLog[]
     // fallback
   }
 
-  return inMemoryReadingLogs.slice(0, limit);
+  if (isRoot || (!userId && !normalizedEmail)) {
+    return inMemoryReadingLogs.slice(0, limit);
+  }
+
+  return inMemoryReadingLogs
+    .filter((l) => (userId && l.user_id === userId) || (normalizedEmail && l.user_email === normalizedEmail))
+    .slice(0, limit);
 }
 
-export async function getUserReadingStats() {
-  const logs = await fetchUserReadingLogs(100);
+export async function getUserReadingStats(
+  userId?: string,
+  userEmail?: string,
+  role?: string
+) {
+  const logs = await fetchUserReadingLogs(100, userId, userEmail, role);
   const totalArticles = logs.length;
   const totalSeconds = logs.reduce((acc, item) => acc + (item.reading_time_seconds || 0), 0);
   const totalMinutes = (totalSeconds / 60).toFixed(1);

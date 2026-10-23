@@ -19,7 +19,12 @@ export interface ZipIngestionResult {
  * Parses and ingests a full LinkedIn Data Export ZIP archive (up to 100MB+).
  * Extracts Shares.csv, Articles.csv, Positions.csv, Skills.csv, and Comments.csv.
  */
-export async function processLinkedInZipArchive(buffer: Buffer, fileName: string): Promise<ZipIngestionResult> {
+export async function processLinkedInZipArchive(
+  buffer: Buffer,
+  fileName: string,
+  userId?: string,
+  userEmail?: string
+): Promise<ZipIngestionResult> {
   const zip = new AdmZip(buffer);
   const zipEntries = zip.getEntries();
 
@@ -148,13 +153,22 @@ export async function processLinkedInZipArchive(buffer: Buffer, fileName: string
         category: item.category,
         conceptKey: item.key,
         memoryText: item.text,
+        userId,
+        userEmail,
       });
 
       const vector = await generateMultimodalEmbedding(item.text);
-      await saveMultimodalVector(item.key, item.category, vector, {
-        fileName,
-        ingestedAt: new Date().toISOString(),
-      });
+      await saveMultimodalVector(
+        item.key,
+        item.category,
+        vector,
+        {
+          fileName,
+          ingestedAt: new Date().toISOString(),
+        },
+        userId,
+        userEmail
+      );
     } catch (err: any) {
       console.warn("[zipImporter] Item processing warning:", err.message);
     }

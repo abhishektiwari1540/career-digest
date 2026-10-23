@@ -43,6 +43,8 @@ export interface ChatMessage {
 
 export interface ChatSession {
   id: string;
+  user_id?: string;
+  user_email?: string;
   title: string;
   presetMode: "deep_planner" | "fact_checker" | "architect" | "general";
   pinned: boolean;
@@ -59,10 +61,17 @@ const inMemoryMessages: Map<string, ChatMessage[]> = new Map();
  */
 export async function createChatSession(
   title = "New Conversation",
-  presetMode: ChatSession["presetMode"] = "deep_planner"
+  presetMode: ChatSession["presetMode"] = "deep_planner",
+  userId?: string,
+  userEmail?: string
 ): Promise<ChatSession> {
+  const normalizedEmail = (userEmail || "abhishektiwari1540@gmail.com").trim().toLowerCase();
+  const assignedUserId = userId || (normalizedEmail === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : `usr_${Date.now()}`);
+
   const newSession: ChatSession = {
     id: `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    user_id: assignedUserId,
+    user_email: normalizedEmail,
     title,
     presetMode,
     pinned: false,
@@ -75,6 +84,8 @@ export async function createChatSession(
       .from("chat_sessions")
       .insert({
         id: newSession.id,
+        user_id: newSession.user_id,
+        user_email: newSession.user_email,
         title: newSession.title,
         preset_mode: newSession.presetMode,
         pinned: newSession.pinned,
@@ -86,6 +97,18 @@ export async function createChatSession(
 
     if (!error && data) {
       newSession.id = data.id;
+    } else if (error && (error.message?.includes("user_id") || error.message?.includes("user_email"))) {
+      // Fallback without user_id if columns not migrated on remote table
+      await supabase
+        .from("chat_sessions")
+        .insert({
+          id: newSession.id,
+          title: newSession.title,
+          preset_mode: newSession.presetMode,
+          pinned: newSession.pinned,
+          created_at: newSession.createdAt,
+          updated_at: newSession.updatedAt,
+        });
     }
   } catch (err: any) {
     // Supabase table may not exist yet, fallback to in-memory
@@ -100,32 +123,65 @@ export async function createChatSession(
 }
 
 /**
- * Retrieves all chat sessions
+ * Retrieves chat sessions scoped to user or all if projectadmin
  */
-export async function getChatSessions(): Promise<ChatSession[]> {
+export async function getChatSessions(
+  userId?: string,
+  userEmail?: string,
+  role?: string
+): Promise<ChatSession[]> {
+  const isRoot = role === "projectadmin" || userEmail === "abhishektiwari1540@gmail.com";
+  const normalizedEmail = (userEmail || "").trim().toLowerCase();
+
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("chat_sessions")
       .select("*")
       .order("updated_at", { ascending: false });
 
+    if (!isRoot && (userId || normalizedEmail)) {
+      if (userId) {
+        query = query.or(`user_id.eq.${userId},user_email.eq.${normalizedEmail}`);
+      } else {
+        query = query.eq("user_email", normalizedEmail);
+      }
+    }
+
+    const { data, error } = await query;
+
     if (!error && data && data.length > 0) {
-      return data.map((d: any) => ({
-        id: d.id,
-        title: d.title,
-        presetMode: d.preset_mode || "deep_planner",
-        pinned: Boolean(d.pinned),
-        createdAt: d.created_at,
-        updatedAt: d.updated_at,
-      }));
+      // Cache into in-memory store
+      data.forEach((d: any) => {
+        const uId = d.user_id || (d.user_email === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : undefined);
+        inMemorySessions.set(d.id, {
+          id: d.id,
+          user_id: uId,
+          user_email: d.user_email || "abhishektiwari1540@gmail.com",
+          title: d.title,
+          presetMode: d.preset_mode || "deep_planner",
+          pinned: Boolean(d.pinned),
+          createdAt: d.created_at,
+          updatedAt: d.updated_at,
+        });
+      });
     }
   } catch {
     // fallback
   }
 
-  return Array.from(inMemorySessions.values()).sort(
+  const all = Array.from(inMemorySessions.values()).sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
+
+  if (isRoot || (!userId && !normalizedEmail)) {
+    return all;
+  }
+
+  return all.filter((s) => {
+    if (userId && s.user_id === userId) return true;
+    if (normalizedEmail && s.user_email?.toLowerCase() === normalizedEmail) return true;
+    return false;
+  });
 }
 
 /**
