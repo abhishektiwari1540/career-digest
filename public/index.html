@@ -1061,9 +1061,10 @@ export function DailyChampionBlog() {
       </div>
 
       <!-- Auth Tabs Switcher -->
-      <div style="display:flex; gap:0.5rem; padding:0.75rem 1.25rem; background:rgba(0,0,0,0.25); border-bottom:1px solid rgba(255,255,255,0.06);">
-        <button class="chip-btn active" id="auth-tab-login-btn" style="flex:1; text-align:center;">Sign In (Owner / User)</button>
-        <button class="chip-btn" id="auth-tab-activate-btn" style="flex:1; text-align:center;">Request Clone Access</button>
+      <div style="display:flex; gap:0.4rem; padding:0.75rem 1.25rem; background:rgba(0,0,0,0.25); border-bottom:1px solid rgba(255,255,255,0.06);">
+        <button class="chip-btn active" id="auth-tab-login-btn" style="flex:1; text-align:center; font-size:0.8rem; padding:0.4rem 0.6rem;">Sign In</button>
+        <button class="chip-btn" id="auth-tab-activate-btn" style="flex:1; text-align:center; font-size:0.8rem; padding:0.4rem 0.6rem;">Clone Access</button>
+        <button class="chip-btn" id="auth-tab-reset-btn" style="flex:1; text-align:center; font-size:0.8rem; padding:0.4rem 0.6rem;">Reset Password</button>
       </div>
 
       <div class="modal-body" style="padding:1.25rem;">
@@ -1079,9 +1080,15 @@ export function DailyChampionBlog() {
             <input type="email" id="login-input-email" placeholder="abhishektiwari1540@gmail.com" style="width:100%; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.88rem;" />
           </div>
 
-          <div style="margin-bottom:1.25rem;">
+          <div style="margin-bottom:0.4rem;">
             <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Password</label>
             <input type="password" id="login-input-password" placeholder="••••••••" style="width:100%; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.88rem;" />
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; margin-bottom:1.15rem;">
+            <button type="button" id="auth-forgot-password-link" style="background:none; border:none; color:#38bdf8; font-size:0.78rem; cursor:pointer; text-decoration:underline; padding:0;">
+              Forgot Password?
+            </button>
           </div>
 
           <div id="login-error-msg" style="display:none; color:#f87171; font-size:0.82rem; margin-bottom:0.75rem;"></div>
@@ -1113,6 +1120,70 @@ export function DailyChampionBlog() {
           <button class="btn primary-btn" id="req-submit-btn" style="width:100%; padding:0.65rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.92rem;">
             🚀 Submit Request to Abhishek Tiwari
           </button>
+        </div>
+
+        <!-- Form 3: Password Reset Flow -->
+        <div id="auth-reset-form-container" style="display:none;">
+          <!-- Reset Step 1: Request Code -->
+          <div id="modal-reset-step1">
+            <div style="background:rgba(56,189,248,0.08); border-left:3px solid #38bdf8; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#bae6fd; margin-bottom:1rem;">
+              🔑 <strong>Password Reset Verification:</strong> Enter your registered email address to receive a secure 6-digit OTP code.
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Registered Email Address</label>
+              <input type="email" id="modal-reset-email" placeholder="abhishektiwari1540@gmail.com" style="width:100%; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.88rem;" />
+            </div>
+
+            <div id="modal-reset-step1-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+            <button class="btn primary-btn" id="modal-send-code-btn" style="width:100%; padding:0.65rem; font-weight:700; background:linear-gradient(135deg, #0ea5e9, #0284c7); font-size:0.92rem; margin-bottom:0.75rem;">
+              ✉️ Send 6-Digit OTP Code
+            </button>
+
+            <div style="text-align:center; font-size:0.8rem; margin-top:0.5rem;">
+              <a href="/reset-password" target="_blank" style="color:#a5b4fc; text-decoration:none; font-size:0.78rem;">
+                ↗ Open Full Reset Page in New Tab
+              </a>
+            </div>
+          </div>
+
+          <!-- Reset Step 2: Verify Code and Set New Password -->
+          <div id="modal-reset-step2" style="display:none;">
+            <div style="background:rgba(16,185,129,0.08); border-left:3px solid #10b981; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#a7f3d0; margin-bottom:1rem;">
+              ✓ Code sent to <strong id="modal-reset-target-email" style="color:#fff;"></strong>. Enter the 6-digit OTP and your new password.
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">6-Digit Verification Code</label>
+              <input type="text" id="modal-reset-code" maxlength="6" placeholder="••••••" style="width:100%; font-family:monospace; font-size:1.3rem; letter-spacing:6px; text-align:center; background:rgba(15,23,42,0.9); border:1px solid rgba(52,211,153,0.5); color:#34d399; padding:0.5rem; border-radius:8px;" />
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">New Password</label>
+              <input type="password" id="modal-reset-newpass" placeholder="Min 6 characters" style="width:100%; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.88rem;" />
+            </div>
+
+            <div style="margin-bottom:1.25rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Confirm New Password</label>
+              <input type="password" id="modal-reset-confirmpass" placeholder="Repeat new password" style="width:100%; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.88rem;" />
+            </div>
+
+            <div id="modal-reset-step2-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+            <button class="btn primary-btn" id="modal-confirm-reset-btn" style="width:100%; padding:0.65rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.92rem;">
+              🔒 Confirm &amp; Save New Password
+            </button>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.9rem; font-size:0.78rem;">
+              <button type="button" id="modal-reset-back-btn" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0;">
+                ← Change Email
+              </button>
+              <button type="button" id="modal-reset-resend-btn" style="background:none; border:none; color:#38bdf8; cursor:pointer; padding:0; text-decoration:underline;">
+                Resend OTP
+              </button>
+            </div>
+          </div>
         </div>
 
       </div>

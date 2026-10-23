@@ -107,6 +107,9 @@ import {
   logGlobalSearch,
   logGlobalChat,
   getAdminTelemetryDashboard,
+  requestPasswordReset,
+  confirmPasswordReset,
+  changePassword,
 } from "./storage/securityEngine.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -197,6 +200,20 @@ app.get("/", (req, res, next) => {
   const foundIndex = indexCandidates.find((p) => fs.existsSync(p));
   if (foundIndex) {
     return res.sendFile(foundIndex);
+  }
+  next();
+});
+
+app.get(["/reset-password", "/forgot-password"], (req, res, next) => {
+  const resetCandidates = [
+    path.join(resolvedPublicPath, "reset-password.html"),
+    path.join(process.cwd(), "public/reset-password.html"),
+    path.join(__dirname, "../public/reset-password.html"),
+    path.join(__dirname, "../../public/reset-password.html"),
+  ];
+  const foundReset = resetCandidates.find((p) => fs.existsSync(p));
+  if (foundReset) {
+    return res.sendFile(foundReset);
   }
   next();
 });
@@ -1484,6 +1501,57 @@ app.get("/api/auth/me", (req, res) => {
     return res.status(401).json({ success: false, error: "Invalid or expired session token" });
   }
   res.json({ success: true, user: verified.user });
+});
+
+// POST /api/auth/forgot-password - Send 6-digit OTP verification code for password reset
+app.post("/api/auth/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const result = await requestPasswordReset(email);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/auth/reset-password - Verify 6-digit code and set new bcrypt password
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const { email, resetCode, newPassword } = req.body;
+    const result = await confirmPasswordReset(email, resetCode, newPassword);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/auth/change-password - Authenticated user password update
+app.post("/api/auth/change-password", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, error: "Missing authorization token" });
+    }
+    const token = authHeader.split(" ")[1];
+    const verified = verifyAuthToken(token);
+    if (!verified.valid || !verified.user) {
+      return res.status(401).json({ success: false, error: "Invalid or expired session token" });
+    }
+    const { currentPassword, newPassword } = req.body;
+    const result = await changePassword(verified.user.email, currentPassword, newPassword);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // POST /api/activation/request - Cloned instance first-run access request with geolocation

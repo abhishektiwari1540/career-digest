@@ -84,6 +84,7 @@ const memoryAccessRequests = new Map<string, AccessRequest>();
 const memoryInstances = new Map<string, RegisteredInstance>();
 const memoryChatLogs: GlobalChatLog[] = [];
 const memorySearchLogs: GlobalSearchLog[] = [];
+export const memoryResetCodes = new Map<string, { email: string; code: string; expiresAt: number }>();
 
 /**
  * Initialize Security Engine: Seed Root Admin (Abhishek Tiwari)
@@ -213,6 +214,177 @@ export function verifyAuthToken(token: string): { valid: boolean; user?: any; er
   } catch (err: any) {
     return { valid: false, error: err.message };
   }
+}
+
+/**
+ * Request Password Reset: Generates a 6-digit verification code and emails it via Resend
+ */
+export async function requestPasswordReset(email: string): Promise<{ success: boolean; message: string; debugCode?: string }> {
+  const normalizedEmail = (email || "").trim().toLowerCase();
+  if (!normalizedEmail) {
+    return { success: false, message: "Email address is required." };
+  }
+
+  if (memoryUsers.size === 0) {
+    await initSecurityEngine();
+  }
+
+  let userExists = memoryUsers.has(normalizedEmail);
+  if (!userExists) {
+    try {
+      const { data } = await supabase.from("system_users").select("id").eq("email", normalizedEmail).maybeSingle();
+      if (data) userExists = true;
+    } catch {}
+  }
+
+  if (!userExists) {
+    return { success: false, message: "No registered account found with this email address." };
+  }
+
+  // Generate 6-digit numeric verification code
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+  memoryResetCodes.set(normalizedEmail, {
+    email: normalizedEmail,
+    code,
+    expiresAt,
+  });
+
+  // Dispatch email via Resend
+  if (resendClient && config.resend.apiKey) {
+    try {
+      await resendClient.emails.send({
+        from: config.resend.fromEmail || "no-reply@career-digest.online",
+        to: normalizedEmail,
+        subject: "🔑 Career-Digest Password Reset Verification Code",
+        html: `
+          <div style="font-family:sans-serif; background:#0f172a; color:#fff; padding:2rem; border-radius:10px; max-width:600px; margin:auto;">
+            <h2 style="color:#38bdf8; margin-top:0;">Password Reset Request</h2>
+            <p>You requested a password reset for your <strong>Career-Digest</strong> account.</p>
+            <div style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); padding:1rem; border-radius:8px; margin:1.5rem 0; text-align:center;">
+              <div style="font-size:0.8rem; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:0.4rem;">Your 6-Digit Verification Code</div>
+              <div style="font-size:2.2rem; font-weight:800; color:#34d399; letter-spacing:4px; font-family:monospace;">${code}</div>
+              <div style="font-size:0.75rem; color:#f59e0b; margin-top:0.4rem;">⏱️ Valid for 15 minutes</div>
+            </div>
+            <p style="font-size:0.85rem; color:#94a3b8;">Enter this 6-digit code in the Career-Digest password reset window to set your new password.</p>
+            <hr style="border:none; border-top:1px solid rgba(255,255,255,0.1); margin:1.5rem 0;" />
+            <p style="font-size:0.75rem; color:#64748b;">Project Owner: Abhishek Tiwari · Jaipur, India · abhishektiwari1540@gmail.com</p>
+          </div>
+        `,
+      });
+      console.log(`[security] Password reset code dispatched via Resend to ${normalizedEmail}`);
+    } catch (mailErr: any) {
+      console.warn("[security] Email dispatch notice for password reset:", mailErr.message);
+    }
+  }
+
+  const isLocalDev = !config.resend.apiKey || config.resend.apiKey.includes("placeholder");
+
+  return {
+    success: true,
+    message: `Verification code sent to ${normalizedEmail}! Please check your email inbox.`,
+    debugCode: isLocalDev ? code : undefined,
+  };
+}
+
+/**
+ * Confirm Password Reset: Verifies 6-digit code and applies new bcrypt password hash
+ */
+export async function confirmPasswordReset(
+  email: string,
+  resetCode: string,
+  newPasswordPlain: string
+): Promise<{ success: boolean; message: string }> {
+  const normalizedEmail = (email || "").trim().toLowerCase();
+  const code = (resetCode || "").trim();
+  const newPass = (newPasswordPlain || "").trim();
+
+  if (!normalizedEmail || !code || !newPass) {
+    return { success: false, message: "Email, 6-digit verification code, and new password are required." };
+  }
+
+  if (newPass.length < 6) {
+    return { success: false, message: "New password must be at least 6 characters long." };
+  }
+
+  const record = memoryResetCodes.get(normalizedEmail);
+  if (!record || record.code !== code) {
+    return { success: false, message: "Invalid or expired verification code." };
+  }
+
+  if (Date.now() > record.expiresAt) {
+    memoryResetCodes.delete(normalizedEmail);
+    return { success: false, message: "Verification code has expired. Please request a new code." };
+  }
+
+  const salt = bcrypt.genSaltSync(12);
+  const passwordHash = bcrypt.hashSync(newPass, salt);
+
+  // Update in memory
+  const memUser = memoryUsers.get(normalizedEmail);
+  if (memUser) {
+    memUser.password_hash = passwordHash;
+    memoryUsers.set(normalizedEmail, memUser);
+  }
+
+  // Update in Supabase
+  try {
+    await supabase.from("system_users").update({
+      password_hash: passwordHash,
+      updated_at: new Date().toISOString(),
+    }).eq("email", normalizedEmail);
+  } catch (err: any) {
+    console.warn("[security] Supabase password update notice:", err.message);
+  }
+
+  // Clear code once used
+  memoryResetCodes.delete(normalizedEmail);
+
+  return {
+    success: true,
+    message: "Password reset successfully! You can now log in with your new password.",
+  };
+}
+
+/**
+ * Change Password (Authenticated User)
+ */
+export async function changePassword(
+  email: string,
+  currentPasswordPlain: string,
+  newPasswordPlain: string
+): Promise<{ success: boolean; message: string }> {
+  const loginRes = await loginUser(email, currentPasswordPlain);
+  if (!loginRes.success) {
+    return { success: false, message: "Incorrect current password." };
+  }
+
+  if (!newPasswordPlain || newPasswordPlain.length < 6) {
+    return { success: false, message: "New password must be at least 6 characters long." };
+  }
+
+  const salt = bcrypt.genSaltSync(12);
+  const passwordHash = bcrypt.hashSync(newPasswordPlain, salt);
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const memUser = memoryUsers.get(normalizedEmail);
+  if (memUser) {
+    memUser.password_hash = passwordHash;
+    memoryUsers.set(normalizedEmail, memUser);
+  }
+
+  try {
+    await supabase.from("system_users").update({
+      password_hash: passwordHash,
+      updated_at: new Date().toISOString(),
+    }).eq("email", normalizedEmail);
+  } catch {}
+
+  return {
+    success: true,
+    message: "Password updated successfully!",
+  };
 }
 
 /**

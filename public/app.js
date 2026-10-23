@@ -3165,25 +3165,36 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-    // Switch between Sign In and Request Activation tabs
+    // Switch between Sign In, Request Activation, and Password Reset tabs
     const tabLoginBtn = document.getElementById("auth-tab-login-btn");
     const tabActivateBtn = document.getElementById("auth-tab-activate-btn");
+    const tabResetBtn = document.getElementById("auth-tab-reset-btn");
+    const forgotPasswordLink = document.getElementById("auth-forgot-password-link");
     const formLogin = document.getElementById("auth-login-form-container");
     const formActivate = document.getElementById("auth-activate-form-container");
+    const formReset = document.getElementById("auth-reset-form-container");
 
-    if (tabLoginBtn && tabActivateBtn && formLogin && formActivate) {
-      tabLoginBtn.onclick = () => {
-        tabLoginBtn.classList.add("active");
-        tabActivateBtn.classList.remove("active");
-        formLogin.style.display = "block";
-        formActivate.style.display = "none";
-      };
+    function showAuthTab(activeTabName) {
+      if (tabLoginBtn) tabLoginBtn.classList.toggle("active", activeTabName === "login");
+      if (tabActivateBtn) tabActivateBtn.classList.toggle("active", activeTabName === "activate");
+      if (tabResetBtn) tabResetBtn.classList.toggle("active", activeTabName === "reset");
 
-      tabActivateBtn.onclick = () => {
-        tabActivateBtn.classList.add("active");
-        tabLoginBtn.classList.remove("active");
-        formLogin.style.display = "none";
-        formActivate.style.display = "block";
+      if (formLogin) formLogin.style.display = activeTabName === "login" ? "block" : "none";
+      if (formActivate) formActivate.style.display = activeTabName === "activate" ? "block" : "none";
+      if (formReset) formReset.style.display = activeTabName === "reset" ? "block" : "none";
+    }
+
+    if (tabLoginBtn) tabLoginBtn.onclick = () => showAuthTab("login");
+    if (tabActivateBtn) tabActivateBtn.onclick = () => showAuthTab("activate");
+    if (tabResetBtn) tabResetBtn.onclick = () => showAuthTab("reset");
+    if (forgotPasswordLink) {
+      forgotPasswordLink.onclick = () => {
+        showAuthTab("reset");
+        const loginEmail = document.getElementById("login-input-email")?.value?.trim();
+        const resetEmail = document.getElementById("modal-reset-email");
+        if (loginEmail && resetEmail) {
+          resetEmail.value = loginEmail;
+        }
       };
     }
 
@@ -3302,6 +3313,205 @@ document.addEventListener("DOMContentLoaded", () => {
         } finally {
           reqSubmitBtn.disabled = false;
           reqSubmitBtn.textContent = "🚀 Submit Request to Abhishek Tiwari";
+        }
+      };
+    }
+
+    // 6. Password Reset Handlers inside Modal
+    const modalSendCodeBtn = document.getElementById("modal-send-code-btn");
+    const modalResetEmail = document.getElementById("modal-reset-email");
+    const modalResetStep1Msg = document.getElementById("modal-reset-step1-msg");
+    const modalResetStep1 = document.getElementById("modal-reset-step1");
+    const modalResetStep2 = document.getElementById("modal-reset-step2");
+    const modalResetTargetEmail = document.getElementById("modal-reset-target-email");
+    const modalResetCode = document.getElementById("modal-reset-code");
+    const modalResetNewPass = document.getElementById("modal-reset-newpass");
+    const modalResetConfirmPass = document.getElementById("modal-reset-confirmpass");
+    const modalConfirmResetBtn = document.getElementById("modal-confirm-reset-btn");
+    const modalResetStep2Msg = document.getElementById("modal-reset-step2-msg");
+    const modalResetBackBtn = document.getElementById("modal-reset-back-btn");
+    const modalResetResendBtn = document.getElementById("modal-reset-resend-btn");
+
+    let currentResetEmail = "";
+
+    async function handleModalSendCode() {
+      const email = modalResetEmail?.value?.trim();
+      if (!email || !email.includes("@")) {
+        if (modalResetStep1Msg) {
+          modalResetStep1Msg.style.color = "#f87171";
+          modalResetStep1Msg.textContent = "Please enter a valid email address.";
+          modalResetStep1Msg.style.display = "block";
+        }
+        return;
+      }
+
+      currentResetEmail = email;
+      if (modalSendCodeBtn) {
+        modalSendCodeBtn.disabled = true;
+        modalSendCodeBtn.textContent = "Sending OTP...";
+      }
+      if (modalResetStep1Msg) modalResetStep1Msg.style.display = "none";
+
+      try {
+        const res = await fetch("/api/auth/forgot-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: currentResetEmail }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          if (modalResetTargetEmail) modalResetTargetEmail.textContent = currentResetEmail;
+          if (modalResetStep1) modalResetStep1.style.display = "none";
+          if (modalResetStep2) modalResetStep2.style.display = "block";
+          if (modalResetCode) {
+            modalResetCode.value = data.debugCode || "";
+            modalResetCode.focus();
+          }
+          if (modalResetStep2Msg) {
+            if (data.debugCode) {
+              modalResetStep2Msg.style.color = "#38bdf8";
+              modalResetStep2Msg.textContent = `[Dev Mode] Verification code: ${data.debugCode}`;
+            } else {
+              modalResetStep2Msg.style.color = "#34d399";
+              modalResetStep2Msg.textContent = data.message || "OTP code sent to your email!";
+            }
+            modalResetStep2Msg.style.display = "block";
+          }
+        } else {
+          throw new Error(data.message || data.error || "Failed to send reset code.");
+        }
+      } catch (err) {
+        if (modalResetStep1Msg) {
+          modalResetStep1Msg.style.color = "#f87171";
+          modalResetStep1Msg.textContent = err.message;
+          modalResetStep1Msg.style.display = "block";
+        }
+      } finally {
+        if (modalSendCodeBtn) {
+          modalSendCodeBtn.disabled = false;
+          modalSendCodeBtn.textContent = "✉️ Send 6-Digit OTP Code";
+        }
+      }
+    }
+
+    if (modalSendCodeBtn) modalSendCodeBtn.onclick = handleModalSendCode;
+
+    if (modalResetBackBtn) {
+      modalResetBackBtn.onclick = () => {
+        if (modalResetStep2) modalResetStep2.style.display = "none";
+        if (modalResetStep1) modalResetStep1.style.display = "block";
+      };
+    }
+
+    if (modalResetResendBtn) {
+      modalResetResendBtn.onclick = async () => {
+        if (!currentResetEmail) return;
+        modalResetResendBtn.textContent = "Resending...";
+        try {
+          const res = await fetch("/api/auth/forgot-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: currentResetEmail }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            if (modalResetStep2Msg) {
+              modalResetStep2Msg.style.color = "#34d399";
+              modalResetStep2Msg.textContent = data.debugCode
+                ? `[Dev Mode] New code: ${data.debugCode}`
+                : "A new 6-digit OTP code has been dispatched to your email.";
+              modalResetStep2Msg.style.display = "block";
+            }
+            if (data.debugCode && modalResetCode) modalResetCode.value = data.debugCode;
+          } else {
+            throw new Error(data.message || "Failed to resend code.");
+          }
+        } catch (err) {
+          if (modalResetStep2Msg) {
+            modalResetStep2Msg.style.color = "#f87171";
+            modalResetStep2Msg.textContent = err.message;
+            modalResetStep2Msg.style.display = "block";
+          }
+        } finally {
+          modalResetResendBtn.textContent = "Resend OTP";
+        }
+      };
+    }
+
+    if (modalConfirmResetBtn) {
+      modalConfirmResetBtn.onclick = async () => {
+        const code = modalResetCode?.value?.trim();
+        const newPassword = modalResetNewPass?.value?.trim();
+        const confirmPassword = modalResetConfirmPass?.value?.trim();
+
+        if (!code || code.length !== 6) {
+          if (modalResetStep2Msg) {
+            modalResetStep2Msg.style.color = "#f87171";
+            modalResetStep2Msg.textContent = "Please enter the 6-digit OTP code.";
+            modalResetStep2Msg.style.display = "block";
+          }
+          return;
+        }
+
+        if (!newPassword || newPassword.length < 6) {
+          if (modalResetStep2Msg) {
+            modalResetStep2Msg.style.color = "#f87171";
+            modalResetStep2Msg.textContent = "New password must be at least 6 characters long.";
+            modalResetStep2Msg.style.display = "block";
+          }
+          return;
+        }
+
+        if (newPassword !== confirmPassword) {
+          if (modalResetStep2Msg) {
+            modalResetStep2Msg.style.color = "#f87171";
+            modalResetStep2Msg.textContent = "Passwords do not match.";
+            modalResetStep2Msg.style.display = "block";
+          }
+          return;
+        }
+
+        modalConfirmResetBtn.disabled = true;
+        modalConfirmResetBtn.textContent = "Updating Password...";
+        if (modalResetStep2Msg) modalResetStep2Msg.style.display = "none";
+
+        try {
+          const res = await fetch("/api/auth/reset-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: currentResetEmail,
+              resetCode: code,
+              newPassword: newPassword,
+            }),
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            alert("🎉 " + (data.message || "Password updated successfully!"));
+            showAuthTab("login");
+            const loginEmailInput = document.getElementById("login-input-email");
+            const loginPasswordInput = document.getElementById("login-input-password");
+            if (loginEmailInput) loginEmailInput.value = currentResetEmail;
+            if (loginPasswordInput) loginPasswordInput.value = newPassword;
+            if (modalResetStep2) modalResetStep2.style.display = "none";
+            if (modalResetStep1) modalResetStep1.style.display = "block";
+            if (modalResetCode) modalResetCode.value = "";
+            if (modalResetNewPass) modalResetNewPass.value = "";
+            if (modalResetConfirmPass) modalResetConfirmPass.value = "";
+          } else {
+            throw new Error(data.message || data.error || "Password reset failed.");
+          }
+        } catch (err) {
+          if (modalResetStep2Msg) {
+            modalResetStep2Msg.style.color = "#f87171";
+            modalResetStep2Msg.textContent = err.message;
+            modalResetStep2Msg.style.display = "block";
+          }
+        } finally {
+          modalConfirmResetBtn.disabled = false;
+          modalConfirmResetBtn.textContent = "🔒 Confirm & Save New Password";
         }
       };
     }
