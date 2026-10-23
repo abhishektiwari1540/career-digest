@@ -119,6 +119,9 @@ import {
   requestPasswordReset,
   confirmPasswordReset,
   changePassword,
+  isDisposableEmail,
+  requestActivationOtp,
+  verifyActivationOtpAndGenerateCredentials,
 } from "./storage/securityEngine.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1773,12 +1776,12 @@ app.post("/api/auth/change-password", async (req, res) => {
   }
 });
 
-// POST /api/activation/request - Cloned instance first-run access request with geolocation
+// POST /api/activation/request - Cloned instance first-run access request: sends 6-digit OTP to genuine email (blocks disposable/burner emails)
 app.post("/api/activation/request", async (req, res) => {
   try {
     const { requesterEmail, machineId, country, city, deviceOs } = req.body;
     const ipAddress = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "127.0.0.1";
-    const result = await submitAccessRequest({
+    const result = await requestActivationOtp({
       requesterEmail,
       machineId,
       ipAddress,
@@ -1786,10 +1789,39 @@ app.post("/api/activation/request", async (req, res) => {
       city,
       deviceOs,
     });
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// POST /api/activation/verify-otp - Verify 6-digit OTP code, auto-generate credentials, and dispatch to real email
+app.post("/api/activation/verify-otp", async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    const result = await verifyActivationOtpAndGenerateCredentials(email, code);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/activation/validate-email - Instant real-time pre-check for disposable / temp email providers
+app.post("/api/activation/validate-email", (req, res) => {
+  const { email } = req.body;
+  const check = isDisposableEmail(email || "");
+  res.json({
+    valid: !check.isDisposable,
+    isDisposable: check.isDisposable,
+    reason: check.reason,
+    domain: check.domain,
+  });
 });
 
 // GET /api/admin/telemetry - Live omniscient dashboard for projectadmin (Abhishek Tiwari)

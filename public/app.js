@@ -3627,14 +3627,89 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-    // Gatekeeper Clone Activation Request Submit
+    // Disposable / Temporary Email Domain Filter
+    const CLIENT_DISPOSABLE_DOMAINS = new Set([
+      "yopmail.com", "yopmail.fr", "yopmail.net", "cool.fr.nf", "jetable.fr.nf", "courriel.fr.nf", "moncourrier.fr.nf",
+      "mailinator.com", "mailinator2.com", "mailinater.com", "suremail.info", "spamherelots.com",
+      "tempmail.com", "temp-mail.org", "temp-mail.io", "tempail.com", "tempm.com", "tempmail.net",
+      "10minutemail.com", "10minutemail.net", "10minutemail.org", "10minmail.com", "10minutemail.co.uk",
+      "guerrillamail.com", "guerrillamail.net", "guerrillamail.org", "guerrillamailblock.com", "sharklasers.com", "grr.la", "pokemail.net",
+      "trashmail.com", "trashmail.net", "trashmail.me", "trash-mail.com",
+      "dispostable.com", "getairmail.com", "mohmal.com", "fakeinbox.com", "throwawaymail.com",
+      "nada.ltd", "inboxkitten.com", "crazymailing.com", "tempinbox.com", "mytemp.email",
+      "burnermail.io", "emailondeck.com", "generator.email", "disposablemail.com", "dropmail.me",
+      "fakemailgenerator.com", "luxusmail.org", "bouncr.com", "maildrop.cc", "mailnull.com",
+      "mintemail.com", "mytrashmail.com", "spambox.us", "spamgourmet.com", "tempemail.net",
+      "zillamail.com", "mailcatch.com", "yomail.info", "temporarymail.com", "trashymail.com"
+    ]);
+
+    function checkClientDisposableEmail(email) {
+      if (!email || !email.includes("@")) return { isDisposable: false };
+      const parts = email.split("@");
+      if (parts.length !== 2) return { isDisposable: false };
+      const domain = parts[1].toLowerCase().trim();
+      if (CLIENT_DISPOSABLE_DOMAINS.has(domain)) {
+        return { isDisposable: true, domain, reason: `The domain "@${domain}" is a temporary/disposable email provider.` };
+      }
+      const regexPatterns = [
+        /yopmail/i, /mailinator/i, /temp[-_.]?mail/i, /dispos/i, /trash[-_.]?mail/i,
+        /guerrilla/i, /10minute/i, /fake/i, /burner/i, /throwaway/i, /sharklasers/i
+      ];
+      for (const pat of regexPatterns) {
+        if (pat.test(domain)) {
+          return { isDisposable: true, domain, reason: `The domain "@${domain}" matches temporary email provider patterns.` };
+        }
+      }
+      return { isDisposable: false, domain };
+    }
+
+    // Gatekeeper Clone Activation Multi-Step OTP Handshake
+    const gateReqStep1 = document.getElementById("gate-req-step1");
+    const gateReqStep2 = document.getElementById("gate-req-step2");
+    const gateReqStep3 = document.getElementById("gate-req-step3");
     const gateReqBtn = document.getElementById("gate-req-submit-btn");
     const gateReqEmail = document.getElementById("gate-req-email");
+    const gateReqEmailWarning = document.getElementById("gate-req-email-warning");
     const gateReqStatusMsg = document.getElementById("gate-req-status-msg");
+    const gateReqTargetEmail = document.getElementById("gate-req-target-email");
+    const gateReqOtpCode = document.getElementById("gate-req-otp-code");
+    const gateReqOtpStatusMsg = document.getElementById("gate-req-otp-status-msg");
+    const gateReqVerifyBtn = document.getElementById("gate-req-verify-btn");
+    const gateReqBackBtn = document.getElementById("gate-req-back-btn");
+    const gateReqResendBtn = document.getElementById("gate-req-resend-btn");
+    const gateReqSuccessEmail = document.getElementById("gate-req-success-email");
+    const gateReqGotoLoginBtn = document.getElementById("gate-req-goto-login-btn");
 
+    let gateActiveEmail = "";
+
+    function validateGateEmailInput() {
+      const email = gateReqEmail?.value?.trim() || "";
+      if (!email || !email.includes("@")) {
+        if (gateReqEmailWarning) gateReqEmailWarning.style.display = "none";
+        return true;
+      }
+      const check = checkClientDisposableEmail(email);
+      if (check.isDisposable) {
+        if (gateReqEmailWarning) {
+          gateReqEmailWarning.innerHTML = `🚫 <strong>Fake / Disposable Email Blocked:</strong> @${check.domain} is not permitted. Please enter your real work or personal email address (e.g., Gmail, Outlook, Yahoo, Corporate).`;
+          gateReqEmailWarning.style.display = "block";
+        }
+        return false;
+      } else {
+        if (gateReqEmailWarning) gateReqEmailWarning.style.display = "none";
+        return true;
+      }
+    }
+
+    if (gateReqEmail) {
+      gateReqEmail.addEventListener("input", validateGateEmailInput);
+      gateReqEmail.addEventListener("blur", validateGateEmailInput);
+    }
+
+    // Gatekeeper Step 1: Request 6-digit OTP
     if (gateReqBtn) {
       gateReqBtn.onclick = async () => {
-        const email = gateReqEmail?.value?.trim();
+        const email = gateReqEmail?.value?.trim() || "";
         if (!email || !email.includes("@")) {
           if (gateReqStatusMsg) {
             gateReqStatusMsg.style.color = "#f87171";
@@ -3644,8 +3719,19 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
+        const check = checkClientDisposableEmail(email);
+        if (check.isDisposable) {
+          validateGateEmailInput();
+          if (gateReqStatusMsg) {
+            gateReqStatusMsg.style.color = "#f87171";
+            gateReqStatusMsg.textContent = "Disposable & temporary emails are strictly prohibited. Please provide a real email.";
+            gateReqStatusMsg.style.display = "block";
+          }
+          return;
+        }
+
         gateReqBtn.disabled = true;
-        gateReqBtn.textContent = "Submitting Handshake...";
+        gateReqBtn.textContent = "Verifying & Sending OTP...";
         if (gateReqStatusMsg) gateReqStatusMsg.style.display = "none";
 
         try {
@@ -3662,14 +3748,23 @@ document.addEventListener("DOMContentLoaded", () => {
           });
           const data = await res.json();
 
-          if (data.success) {
-            if (gateReqStatusMsg) {
-              gateReqStatusMsg.style.color = "#34d399";
-              gateReqStatusMsg.textContent = "✅ " + data.message;
-              gateReqStatusMsg.style.display = "block";
-            }
-          } else {
-            throw new Error(data.message || "Failed to submit request.");
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || data.error || "Failed to submit request.");
+          }
+
+          gateActiveEmail = email;
+          if (gateReqTargetEmail) gateReqTargetEmail.textContent = email;
+          if (gateReqStep1) gateReqStep1.style.display = "none";
+          if (gateReqStep2) gateReqStep2.style.display = "block";
+          if (gateReqStep3) gateReqStep3.style.display = "none";
+          if (gateReqOtpCode) {
+            gateReqOtpCode.value = "";
+            gateReqOtpCode.focus();
+          }
+          if (gateReqOtpStatusMsg) {
+            gateReqOtpStatusMsg.style.color = "#34d399";
+            gateReqOtpStatusMsg.textContent = "✅ " + data.message;
+            gateReqOtpStatusMsg.style.display = "block";
           }
         } catch (err) {
           if (gateReqStatusMsg) {
@@ -3679,8 +3774,118 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         } finally {
           gateReqBtn.disabled = false;
-          gateReqBtn.textContent = "🚀 Submit Request to Abhishek Tiwari";
+          gateReqBtn.textContent = "✉️ Send 6-Digit Verification OTP Code";
         }
+      };
+    }
+
+    // Gatekeeper Step 2: Verify OTP and trigger credential dispatch
+    if (gateReqVerifyBtn) {
+      gateReqVerifyBtn.onclick = async () => {
+        const code = gateReqOtpCode?.value?.trim() || "";
+        if (!code || code.length < 6) {
+          if (gateReqOtpStatusMsg) {
+            gateReqOtpStatusMsg.style.color = "#f87171";
+            gateReqOtpStatusMsg.textContent = "Please enter the complete 6-digit verification code.";
+            gateReqOtpStatusMsg.style.display = "block";
+          }
+          return;
+        }
+
+        gateReqVerifyBtn.disabled = true;
+        gateReqVerifyBtn.textContent = "Verifying & Generating Password...";
+        if (gateReqOtpStatusMsg) gateReqOtpStatusMsg.style.display = "none";
+
+        try {
+          const res = await fetch("/api/activation/verify-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: gateActiveEmail,
+              code: code,
+            }),
+          });
+          const data = await res.json();
+
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || data.error || "Verification failed.");
+          }
+
+          // Step 3: Success state
+          if (gateReqStep1) gateReqStep1.style.display = "none";
+          if (gateReqStep2) gateReqStep2.style.display = "none";
+          if (gateReqStep3) gateReqStep3.style.display = "block";
+          if (gateReqSuccessEmail) gateReqSuccessEmail.textContent = gateActiveEmail;
+        } catch (err) {
+          if (gateReqOtpStatusMsg) {
+            gateReqOtpStatusMsg.style.color = "#f87171";
+            gateReqOtpStatusMsg.textContent = "Error: " + err.message;
+            gateReqOtpStatusMsg.style.display = "block";
+          }
+        } finally {
+          gateReqVerifyBtn.disabled = false;
+          gateReqVerifyBtn.textContent = "🔐 Verify OTP & Receive Password via Email";
+        }
+      };
+    }
+
+    // Gatekeeper Resend OTP
+    if (gateReqResendBtn) {
+      gateReqResendBtn.onclick = async () => {
+        if (!gateActiveEmail) return;
+        gateReqResendBtn.textContent = "Sending...";
+        try {
+          const res = await fetch("/api/activation/request", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              requesterEmail: gateActiveEmail,
+              machineId: clientMachineId,
+              city: clientTelemetryGeo.city,
+              country: clientTelemetryGeo.country,
+              deviceOs: navigator.platform || "browser",
+            }),
+          });
+          const data = await res.json();
+          if (gateReqOtpStatusMsg) {
+            gateReqOtpStatusMsg.style.color = data.success ? "#34d399" : "#f87171";
+            gateReqOtpStatusMsg.textContent = (data.success ? "✅ " : "❌ ") + (data.message || "Resent OTP.");
+            gateReqOtpStatusMsg.style.display = "block";
+          }
+        } catch (err) {
+          if (gateReqOtpStatusMsg) {
+            gateReqOtpStatusMsg.style.color = "#f87171";
+            gateReqOtpStatusMsg.textContent = "Resend error: " + err.message;
+            gateReqOtpStatusMsg.style.display = "block";
+          }
+        } finally {
+          gateReqResendBtn.textContent = "🔄 Resend OTP Code";
+        }
+      };
+    }
+
+    // Gatekeeper Change Email (Back to Step 1)
+    if (gateReqBackBtn) {
+      gateReqBackBtn.onclick = () => {
+        if (gateReqStep1) gateReqStep1.style.display = "block";
+        if (gateReqStep2) gateReqStep2.style.display = "none";
+        if (gateReqStep3) gateReqStep3.style.display = "none";
+        if (gateReqStatusMsg) gateReqStatusMsg.style.display = "none";
+        if (gateReqEmail) gateReqEmail.focus();
+      };
+    }
+
+    // Gatekeeper Proceed to Sign In after verification
+    if (gateReqGotoLoginBtn) {
+      gateReqGotoLoginBtn.onclick = () => {
+        const gateTabLoginBtn = document.getElementById("gate-tab-login-btn");
+        if (gateTabLoginBtn) gateTabLoginBtn.click();
+        const gateLoginEmail = document.getElementById("gate-login-email");
+        if (gateLoginEmail && gateActiveEmail) {
+          gateLoginEmail.value = gateActiveEmail;
+        }
+        const gateLoginPassword = document.getElementById("gate-login-password");
+        if (gateLoginPassword) gateLoginPassword.focus();
       };
     }
 
@@ -4000,18 +4205,77 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-    // Modal Clone Request
+    // Auth Modal Clone Request (Multi-Step OTP Handshake)
+    const authReqStep1 = document.getElementById("auth-req-step1");
+    const authReqStep2 = document.getElementById("auth-req-step2");
+    const authReqStep3 = document.getElementById("auth-req-step3");
     const reqSubmitBtn = document.getElementById("req-submit-btn");
     const reqEmailInput = document.getElementById("req-input-email");
+    const authReqEmailWarning = document.getElementById("auth-req-email-warning");
     const reqStatusMsg = document.getElementById("req-status-msg");
+    const authReqTargetEmail = document.getElementById("auth-req-target-email");
+    const authReqOtpCode = document.getElementById("auth-req-otp-code");
+    const authReqOtpStatusMsg = document.getElementById("auth-req-otp-status-msg");
+    const authReqVerifyBtn = document.getElementById("auth-req-verify-btn");
+    const authReqBackBtn = document.getElementById("auth-req-back-btn");
+    const authReqResendBtn = document.getElementById("auth-req-resend-btn");
+    const authReqSuccessEmail = document.getElementById("auth-req-success-email");
+    const authReqGotoLoginBtn = document.getElementById("auth-req-goto-login-btn");
 
+    let authActiveEmail = "";
+
+    function validateAuthEmailInput() {
+      const email = reqEmailInput?.value?.trim() || "";
+      if (!email || !email.includes("@")) {
+        if (authReqEmailWarning) authReqEmailWarning.style.display = "none";
+        return true;
+      }
+      const check = checkClientDisposableEmail(email);
+      if (check.isDisposable) {
+        if (authReqEmailWarning) {
+          authReqEmailWarning.innerHTML = `🚫 <strong>Fake / Disposable Email Blocked:</strong> @${check.domain} is not permitted. Please enter your real work or personal email address (e.g., Gmail, Outlook, Yahoo, Corporate).`;
+          authReqEmailWarning.style.display = "block";
+        }
+        return false;
+      } else {
+        if (authReqEmailWarning) authReqEmailWarning.style.display = "none";
+        return true;
+      }
+    }
+
+    if (reqEmailInput) {
+      reqEmailInput.addEventListener("input", validateAuthEmailInput);
+      reqEmailInput.addEventListener("blur", validateAuthEmailInput);
+    }
+
+    // Modal Step 1: Send OTP Code
     if (reqSubmitBtn) {
       reqSubmitBtn.onclick = async () => {
-        const email = reqEmailInput?.value?.trim();
-        if (!email || !email.includes("@")) return;
+        const email = reqEmailInput?.value?.trim() || "";
+        if (!email || !email.includes("@")) {
+          if (reqStatusMsg) {
+            reqStatusMsg.style.color = "#f87171";
+            reqStatusMsg.textContent = "Please provide a valid email address.";
+            reqStatusMsg.style.display = "block";
+          }
+          return;
+        }
+
+        const check = checkClientDisposableEmail(email);
+        if (check.isDisposable) {
+          validateAuthEmailInput();
+          if (reqStatusMsg) {
+            reqStatusMsg.style.color = "#f87171";
+            reqStatusMsg.textContent = "Disposable & temporary emails are strictly prohibited. Please provide a real email.";
+            reqStatusMsg.style.display = "block";
+          }
+          return;
+        }
 
         reqSubmitBtn.disabled = true;
-        reqSubmitBtn.textContent = "Transmitting...";
+        reqSubmitBtn.textContent = "Verifying & Sending OTP...";
+        if (reqStatusMsg) reqStatusMsg.style.display = "none";
+
         try {
           const res = await fetch("/api/activation/request", {
             method: "POST",
@@ -4025,10 +4289,24 @@ document.addEventListener("DOMContentLoaded", () => {
             }),
           });
           const data = await res.json();
-          if (data.success && reqStatusMsg) {
-            reqStatusMsg.style.color = "#34d399";
-            reqStatusMsg.textContent = "✅ " + data.message;
-            reqStatusMsg.style.display = "block";
+
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || data.error || "Failed to submit request.");
+          }
+
+          authActiveEmail = email;
+          if (authReqTargetEmail) authReqTargetEmail.textContent = email;
+          if (authReqStep1) authReqStep1.style.display = "none";
+          if (authReqStep2) authReqStep2.style.display = "block";
+          if (authReqStep3) authReqStep3.style.display = "none";
+          if (authReqOtpCode) {
+            authReqOtpCode.value = "";
+            authReqOtpCode.focus();
+          }
+          if (authReqOtpStatusMsg) {
+            authReqOtpStatusMsg.style.color = "#34d399";
+            authReqOtpStatusMsg.textContent = "✅ " + data.message;
+            authReqOtpStatusMsg.style.display = "block";
           }
         } catch (err) {
           if (reqStatusMsg) {
@@ -4038,8 +4316,118 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         } finally {
           reqSubmitBtn.disabled = false;
-          reqSubmitBtn.textContent = "🚀 Submit Request to Abhishek Tiwari";
+          reqSubmitBtn.textContent = "✉️ Send 6-Digit Verification OTP Code";
         }
+      };
+    }
+
+    // Modal Step 2: Verify OTP and receive generated credentials
+    if (authReqVerifyBtn) {
+      authReqVerifyBtn.onclick = async () => {
+        const code = authReqOtpCode?.value?.trim() || "";
+        if (!code || code.length < 6) {
+          if (authReqOtpStatusMsg) {
+            authReqOtpStatusMsg.style.color = "#f87171";
+            authReqOtpStatusMsg.textContent = "Please enter the complete 6-digit verification code.";
+            authReqOtpStatusMsg.style.display = "block";
+          }
+          return;
+        }
+
+        authReqVerifyBtn.disabled = true;
+        authReqVerifyBtn.textContent = "Verifying & Generating Password...";
+        if (authReqOtpStatusMsg) authReqOtpStatusMsg.style.display = "none";
+
+        try {
+          const res = await fetch("/api/activation/verify-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: authActiveEmail,
+              code: code,
+            }),
+          });
+          const data = await res.json();
+
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || data.error || "Verification failed.");
+          }
+
+          // Step 3: Success state
+          if (authReqStep1) authReqStep1.style.display = "none";
+          if (authReqStep2) authReqStep2.style.display = "none";
+          if (authReqStep3) authReqStep3.style.display = "block";
+          if (authReqSuccessEmail) authReqSuccessEmail.textContent = authActiveEmail;
+        } catch (err) {
+          if (authReqOtpStatusMsg) {
+            authReqOtpStatusMsg.style.color = "#f87171";
+            authReqOtpStatusMsg.textContent = "Error: " + err.message;
+            authReqOtpStatusMsg.style.display = "block";
+          }
+        } finally {
+          authReqVerifyBtn.disabled = false;
+          authReqVerifyBtn.textContent = "🔐 Verify OTP & Receive Password via Email";
+        }
+      };
+    }
+
+    // Modal Resend OTP
+    if (authReqResendBtn) {
+      authReqResendBtn.onclick = async () => {
+        if (!authActiveEmail) return;
+        authReqResendBtn.textContent = "Sending...";
+        try {
+          const res = await fetch("/api/activation/request", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              requesterEmail: authActiveEmail,
+              machineId: clientMachineId,
+              city: clientTelemetryGeo.city,
+              country: clientTelemetryGeo.country,
+              deviceOs: navigator.platform || "browser",
+            }),
+          });
+          const data = await res.json();
+          if (authReqOtpStatusMsg) {
+            authReqOtpStatusMsg.style.color = data.success ? "#34d399" : "#f87171";
+            authReqOtpStatusMsg.textContent = (data.success ? "✅ " : "❌ ") + (data.message || "Resent OTP.");
+            authReqOtpStatusMsg.style.display = "block";
+          }
+        } catch (err) {
+          if (authReqOtpStatusMsg) {
+            authReqOtpStatusMsg.style.color = "#f87171";
+            authReqOtpStatusMsg.textContent = "Resend error: " + err.message;
+            authReqOtpStatusMsg.style.display = "block";
+          }
+        } finally {
+          authReqResendBtn.textContent = "🔄 Resend OTP Code";
+        }
+      };
+    }
+
+    // Modal Change Email (Back to Step 1)
+    if (authReqBackBtn) {
+      authReqBackBtn.onclick = () => {
+        if (authReqStep1) authReqStep1.style.display = "block";
+        if (authReqStep2) authReqStep2.style.display = "none";
+        if (authReqStep3) authReqStep3.style.display = "none";
+        if (reqStatusMsg) reqStatusMsg.style.display = "none";
+        if (reqEmailInput) reqEmailInput.focus();
+      };
+    }
+
+    // Modal Proceed to Sign In after verification
+    if (authReqGotoLoginBtn) {
+      authReqGotoLoginBtn.onclick = () => {
+        const authTabLoginBtn = document.getElementById("auth-tab-login-btn");
+        if (authTabLoginBtn) authTabLoginBtn.click();
+        const loginInputEmail = document.getElementById("login-input-email");
+        if (loginInputEmail && authActiveEmail) {
+          loginInputEmail.value = authActiveEmail;
+        }
+        const loginInputPassword = document.getElementById("login-input-password");
+        if (loginInputPassword) loginInputPassword.focus();
       };
     }
 

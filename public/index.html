@@ -66,27 +66,70 @@
           </button>
         </div>
 
-        <!-- Gate Form 2: Request Clone Activation -->
+        <!-- Gate Form 2: Request Clone Activation (OTP + Disposable Email Blocking) -->
         <div id="gate-activate-form-container" style="display:none;">
-          <div style="background:rgba(245,158,11,0.08); border-left:3px solid #f59e0b; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#fde68a; margin-bottom:1rem;">
-            ⚡ <strong>Cloned Instance Handshake:</strong> Request an authorized instance license from project owner <strong>Abhishek Tiwari</strong>.
+          <!-- Step 1: Real Email Submission -->
+          <div id="gate-req-step1">
+            <div style="background:rgba(245,158,11,0.08); border-left:3px solid #f59e0b; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#fde68a; margin-bottom:1rem;">
+              ⚡ <strong>Real Email Verification:</strong> Request an authorized instance license from project owner <strong>Abhishek Tiwari</strong>. Enter your genuine email address (Gmail, Outlook, company domain). <strong>Temporary/disposable emails (e.g. yopmail, mailinator) are strictly forbidden.</strong>
+            </div>
+
+            <div style="margin-bottom:0.75rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Your Genuine Email Address</label>
+              <input type="email" id="gate-req-email" placeholder="developer@gmail.com" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.9rem;" />
+              <div id="gate-req-email-warning" style="display:none; color:#f87171; font-size:0.78rem; margin-top:0.4rem; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); border-radius:6px; padding:0.4rem 0.6rem;"></div>
+            </div>
+
+            <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:0.75rem; margin-bottom:1.15rem;">
+              <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; margin-bottom:0.3rem;">📡 Machine Telemetry Capture</div>
+              <div style="font-size:0.78rem; color:#38bdf8;" id="gate-detected-telemetry-text">📍 Fetching your IP &amp; Geolocation...</div>
+            </div>
+
+            <div id="gate-req-status-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+            <button class="btn primary-btn" id="gate-req-submit-btn" style="width:100%; padding:0.75rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.95rem;">
+              ✉️ Send 6-Digit Verification OTP Code
+            </button>
           </div>
 
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Your Email Address</label>
-            <input type="email" id="gate-req-email" placeholder="developer@example.com" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.9rem;" />
+          <!-- Step 2: 6-Digit OTP Verification -->
+          <div id="gate-req-step2" style="display:none;">
+            <div style="background:rgba(56,189,248,0.08); border-left:3px solid #38bdf8; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#bae6fd; margin-bottom:1rem;">
+              📬 <strong>Check Your Inbox:</strong> A 6-digit OTP code was sent to <strong id="gate-req-target-email" style="color:#fff;"></strong>. Enter it below to verify your email and generate your credentials.
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Enter 6-Digit OTP Code</label>
+              <input type="text" id="gate-req-otp-code" maxlength="6" placeholder="••••••" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(56,189,248,0.4); color:#38bdf8; padding:0.65rem 0.85rem; border-radius:8px; font-size:1.4rem; text-align:center; font-family:monospace; letter-spacing:6px; font-weight:700;" />
+            </div>
+
+            <div id="gate-req-otp-status-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+            <button class="btn primary-btn" id="gate-req-verify-btn" style="width:100%; padding:0.75rem; font-weight:700; background:linear-gradient(135deg, #6366f1, #4f46e5); font-size:0.95rem; margin-bottom:0.75rem;">
+              🔐 Verify OTP &amp; Receive Password via Email
+            </button>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.78rem;">
+              <button type="button" id="gate-req-back-btn" style="background:none; border:none; color:#94a3b8; cursor:pointer; text-decoration:underline; padding:0;">
+                ← Change Email
+              </button>
+              <button type="button" id="gate-req-resend-btn" style="background:none; border:none; color:#38bdf8; cursor:pointer; text-decoration:underline; padding:0;">
+                🔄 Resend OTP Code
+              </button>
+            </div>
           </div>
 
-          <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:0.75rem; margin-bottom:1.25rem;">
-            <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; margin-bottom:0.3rem;">📡 Machine Telemetry Capture</div>
-            <div style="font-size:0.78rem; color:#38bdf8;" id="gate-detected-telemetry-text">📍 Fetching your IP &amp; Geolocation...</div>
+          <!-- Step 3: Success Confirmation -->
+          <div id="gate-req-step3" style="display:none; text-align:center;">
+            <div style="font-size:3rem; margin-bottom:0.5rem;">🎉</div>
+            <h3 style="color:#34d399; margin:0 0 0.5rem 0; font-size:1.2rem;">Email Verified &amp; Instance Activated!</h3>
+            <p style="color:#cbd5e1; font-size:0.85rem; line-height:1.5; margin-bottom:1.25rem;">
+              Your real email <strong id="gate-req-success-email" style="color:#fff;"></strong> has been authenticated. Your <strong>secure password</strong> and <strong>license key</strong> have been dispatched to your inbox.
+            </p>
+            <button class="btn primary-btn" id="gate-req-goto-login-btn" style="width:100%; padding:0.75rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.95rem;">
+              🔑 Proceed to Sign In
+            </button>
           </div>
-
-          <div id="gate-req-status-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
-
-          <button class="btn primary-btn" id="gate-req-submit-btn" style="width:100%; padding:0.75rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.95rem;">
-            🚀 Submit Request to Abhishek Tiwari
-          </button>
         </div>
 
         <!-- Gate Form 3: Password Reset Flow -->
@@ -1294,28 +1337,71 @@ export function DailyChampionBlog() {
           </button>
         </div>
 
-        <!-- Form 2: Request Clone Activation -->
+        <!-- Form 2: Request Clone Activation (OTP + Disposable Email Blocking) -->
         <div id="auth-activate-form-container" style="display:none;">
-          <div style="background:rgba(245,158,11,0.08); border-left:3px solid #f59e0b; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#fde68a; margin-bottom:1rem;">
-            ⚡ <strong>Cloned Instance Handshake:</strong> Submitting sends a hand-to-hand verification request to <strong>Abhishek Tiwari</strong>. Upon approval, your random password &amp; license will be dispatched to your email.
+          <!-- Step 1: Real Email Submission -->
+          <div id="auth-req-step1">
+            <div style="background:rgba(245,158,11,0.08); border-left:3px solid #f59e0b; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#fde68a; margin-bottom:1rem;">
+              ⚡ <strong>Real Email Verification:</strong> Request an authorized instance license from project owner <strong>Abhishek Tiwari</strong>. Enter your genuine email address. <strong>Temporary/disposable emails (e.g. yopmail, mailinator) are strictly forbidden.</strong>
+            </div>
+
+            <div style="margin-bottom:0.75rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Your Genuine Email Address</label>
+              <input type="email" id="req-input-email" placeholder="developer@gmail.com" style="width:100%; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.88rem;" />
+              <div id="auth-req-email-warning" style="display:none; color:#f87171; font-size:0.78rem; margin-top:0.4rem; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); border-radius:6px; padding:0.4rem 0.6rem;"></div>
+            </div>
+
+            <!-- Telemetry Preview Box -->
+            <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:0.75rem; margin-bottom:1.15rem;">
+              <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; margin-bottom:0.3rem;">📡 Auto-Captured Machine Telemetry</div>
+              <div style="font-size:0.78rem; color:#38bdf8;" id="detected-telemetry-text">📍 Fetching your IP &amp; Geolocation...</div>
+            </div>
+
+            <div id="req-status-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+            <button class="btn primary-btn" id="req-submit-btn" style="width:100%; padding:0.65rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.92rem;">
+              ✉️ Send 6-Digit Verification OTP Code
+            </button>
           </div>
 
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Your Email Address</label>
-            <input type="email" id="req-input-email" placeholder="developer@example.com" style="width:100%; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.88rem;" />
+          <!-- Step 2: 6-Digit OTP Verification -->
+          <div id="auth-req-step2" style="display:none;">
+            <div style="background:rgba(56,189,248,0.08); border-left:3px solid #38bdf8; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#bae6fd; margin-bottom:1rem;">
+              📬 <strong>Check Your Inbox:</strong> A 6-digit OTP code was sent to <strong id="auth-req-target-email" style="color:#fff;"></strong>. Enter it below to verify your email and generate your credentials.
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Enter 6-Digit OTP Code</label>
+              <input type="text" id="auth-req-otp-code" maxlength="6" placeholder="••••••" style="width:100%; background:rgba(15,23,42,0.8); border:1px solid rgba(56,189,248,0.4); color:#38bdf8; padding:0.6rem 0.85rem; border-radius:8px; font-size:1.3rem; text-align:center; font-family:monospace; letter-spacing:6px; font-weight:700;" />
+            </div>
+
+            <div id="auth-req-otp-status-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+            <button class="btn primary-btn" id="auth-req-verify-btn" style="width:100%; padding:0.65rem; font-weight:700; background:linear-gradient(135deg, #6366f1, #4f46e5); font-size:0.92rem; margin-bottom:0.75rem;">
+              🔐 Verify OTP &amp; Receive Password via Email
+            </button>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.78rem;">
+              <button type="button" id="auth-req-back-btn" style="background:none; border:none; color:#94a3b8; cursor:pointer; text-decoration:underline; padding:0;">
+                ← Change Email
+              </button>
+              <button type="button" id="auth-req-resend-btn" style="background:none; border:none; color:#38bdf8; cursor:pointer; text-decoration:underline; padding:0;">
+                🔄 Resend OTP Code
+              </button>
+            </div>
           </div>
 
-          <!-- Telemetry Preview Box -->
-          <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:0.75rem; margin-bottom:1.25rem;">
-            <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; margin-bottom:0.3rem;">📡 Auto-Captured Machine Telemetry</div>
-            <div style="font-size:0.78rem; color:#38bdf8;" id="detected-telemetry-text">📍 Fetching your IP &amp; Geolocation...</div>
+          <!-- Step 3: Success Confirmation -->
+          <div id="auth-req-step3" style="display:none; text-align:center;">
+            <div style="font-size:2.8rem; margin-bottom:0.5rem;">🎉</div>
+            <h4 style="color:#34d399; margin:0 0 0.5rem 0; font-size:1.15rem;">Email Verified &amp; Instance Activated!</h4>
+            <p style="color:#cbd5e1; font-size:0.83rem; line-height:1.5; margin-bottom:1.15rem;">
+              Your real email <strong id="auth-req-success-email" style="color:#fff;"></strong> has been authenticated. Your <strong>secure password</strong> and <strong>license key</strong> have been dispatched to your inbox.
+            </p>
+            <button class="btn primary-btn" id="auth-req-goto-login-btn" style="width:100%; padding:0.65rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.92rem;">
+              🔑 Proceed to Sign In
+            </button>
           </div>
-
-          <div id="req-status-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
-
-          <button class="btn primary-btn" id="req-submit-btn" style="width:100%; padding:0.65rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.92rem;">
-            🚀 Submit Request to Abhishek Tiwari
-          </button>
         </div>
 
         <!-- Form 3: Password Reset Flow -->

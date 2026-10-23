@@ -392,6 +392,344 @@ export async function changePassword(
 }
 
 /**
+ * Known temporary / burner / disposable email domains blocklist
+ */
+export const DISPOSABLE_EMAIL_DOMAINS = new Set([
+  "yopmail.com", "yopmail.fr", "yopmail.net", "cool.fr.nf", "jetable.fr.nf", "courriel.fr.nf", "moncourrier.fr.nf",
+  "mailinator.com", "mailinator2.com", "mailinater.com", "suremail.info", "spamherelots.com",
+  "tempmail.com", "temp-mail.org", "temp-mail.io", "tempail.com", "tempm.com", "tempmail.net",
+  "10minutemail.com", "10minutemail.net", "10minutemail.org", "10minmail.com", "10minutemail.co.uk",
+  "guerrillamail.com", "guerrillamail.net", "guerrillamail.org", "guerrillamailblock.com", "sharklasers.com", "grr.la", "pokemail.net",
+  "trashmail.com", "trashmail.net", "trashmail.me", "trash-mail.com",
+  "dispostable.com", "getairmail.com", "mohmal.com", "fakeinbox.com", "throwawaymail.com",
+  "nada.ltd", "inboxkitten.com", "crazymailing.com", "tempinbox.com", "mytemp.email",
+  "burnermail.io", "emailondeck.com", "generator.email", "disposablemail.com", "dropmail.me",
+  "fakemailgenerator.com", "luxusmail.org", "bouncr.com", "maildrop.cc", "mailnull.com",
+  "mintemail.com", "mytrashmail.com", "spambox.us", "spamgourmet.com", "tempemail.net",
+  "zillamail.com", "mailcatch.com", "yomail.info", "temporarymail.com", "trashymail.com",
+  "maildrop.cf", "mohmal.in", "inboxbear.com", "mailsac.com", "harakirimail.com", "getnada.com"
+]);
+
+/**
+ * Checks whether an email address is from a temporary / disposable email service
+ */
+export function isDisposableEmail(email: string): { isDisposable: boolean; domain?: string; reason?: string } {
+  if (!email || !email.includes("@")) {
+    return { isDisposable: false };
+  }
+  const parts = email.split("@");
+  if (parts.length !== 2) return { isDisposable: false };
+  const domain = parts[1].toLowerCase().trim();
+
+  if (DISPOSABLE_EMAIL_DOMAINS.has(domain)) {
+    return {
+      isDisposable: true,
+      domain,
+      reason: `The domain "@${domain}" is a known disposable/temporary email provider.`
+    };
+  }
+
+  // Regex check for subdomains or variations containing disposable keywords
+  const patterns = [
+    /yopmail/i,
+    /mailinator/i,
+    /temp[-_.]?mail/i,
+    /dispos/i,
+    /trash[-_.]?mail/i,
+    /guerrilla/i,
+    /10minute/i,
+    /fake/i,
+    /burner/i,
+    /throwaway/i,
+    /sharklasers/i
+  ];
+
+  for (const pat of patterns) {
+    if (pat.test(domain)) {
+      return {
+        isDisposable: true,
+        domain,
+        reason: `The domain "@${domain}" matches temporary email provider patterns.`
+      };
+    }
+  }
+
+  return { isDisposable: false, domain };
+}
+
+export interface ActivationOtpRecord {
+  email: string;
+  code: string;
+  machineId: string;
+  ipAddress?: string;
+  country?: string;
+  city?: string;
+  deviceOs?: string;
+  expiresAt: number;
+}
+
+const memoryActivationOtpCodes = new Map<string, ActivationOtpRecord>();
+
+/**
+ * Request Activation OTP: Validates real email (rejects temp mail) and dispatches 6-digit OTP code
+ */
+export async function requestActivationOtp(data: {
+  requesterEmail: string;
+  machineId: string;
+  ipAddress?: string;
+  country?: string;
+  city?: string;
+  deviceOs?: string;
+}): Promise<{ success: boolean; message: string; debugCode?: string }> {
+  const normalizedEmail = (data.requesterEmail || "").trim().toLowerCase();
+  if (!normalizedEmail || !normalizedEmail.includes("@")) {
+    return { success: false, message: "A valid email address is required." };
+  }
+
+  // 1. Strict Disposable & Fake Email Filter
+  const check = isDisposableEmail(normalizedEmail);
+  if (check.isDisposable) {
+    return {
+      success: false,
+      message: `Disposable and temporary email addresses (@${check.domain}) are strictly prohibited. Please provide your real, genuine work or personal email address (e.g. Gmail, Outlook, Yahoo, or corporate domain).`,
+    };
+  }
+
+  // 2. Generate 6-Digit Verification Code
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+  memoryActivationOtpCodes.set(normalizedEmail, {
+    email: normalizedEmail,
+    code,
+    machineId: data.machineId || "unknown_machine",
+    ipAddress: data.ipAddress || "127.0.0.1",
+    country: data.country || "Global",
+    city: data.city || "Local",
+    deviceOs: data.deviceOs || process.platform || "unknown_os",
+    expiresAt,
+  });
+
+  // 3. Dispatch OTP Email to User via Resend
+  if (resendClient && config.resend.apiKey) {
+    try {
+      await resendClient.emails.send({
+        from: config.resend.fromEmail || "no-reply@career-digest.online",
+        to: normalizedEmail,
+        subject: "🔐 Career-Digest Email Verification OTP Code",
+        html: `
+          <div style="font-family:sans-serif; background:#0f172a; color:#fff; padding:2rem; border-radius:12px; max-width:600px; margin:auto;">
+            <h2 style="color:#38bdf8; margin-top:0;">Verify Your Email Address</h2>
+            <p>You requested access to an instance of <strong>Career-Digest</strong>.</p>
+            <div style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); padding:1.25rem; border-radius:10px; margin:1.5rem 0; text-align:center;">
+              <div style="font-size:0.8rem; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:0.4rem;">Your 6-Digit Email Verification Code</div>
+              <div style="font-size:2.4rem; font-weight:800; color:#34d399; letter-spacing:6px; font-family:monospace;">${code}</div>
+              <div style="font-size:0.75rem; color:#f59e0b; margin-top:0.5rem;">⏱️ Valid for 10 minutes</div>
+            </div>
+            <p style="font-size:0.85rem; color:#94a3b8; line-height:1.5;">Enter this verification code on your screen to verify your email. Once verified, your auto-generated secure password and license key will be emailed to this address.</p>
+            <hr style="border:none; border-top:1px solid rgba(255,255,255,0.1); margin:1.5rem 0;" />
+            <p style="font-size:0.75rem; color:#64748b;">Project Owner: Abhishek Tiwari · Jaipur, India · abhishektiwari1540@gmail.com</p>
+          </div>
+        `,
+      });
+      console.log(`[security] Activation OTP code dispatched via Resend to ${normalizedEmail}`);
+    } catch (mailErr: any) {
+      console.warn("[security] Email dispatch notice for activation OTP:", mailErr.message);
+    }
+  }
+
+  const isLocalDev = !config.resend.apiKey || config.resend.apiKey.includes("placeholder");
+
+  return {
+    success: true,
+    message: `Verification code sent to ${normalizedEmail}! Please check your email inbox to verify.`,
+    debugCode: (isLocalDev || process.env.NODE_ENV === "test") ? code : undefined,
+  };
+}
+
+/**
+ * Verify Activation OTP & Auto-Generate Credentials for Real Verified User
+ */
+export async function verifyActivationOtpAndGenerateCredentials(
+  email: string,
+  otpCode: string
+): Promise<{ success: boolean; message: string; email?: string }> {
+  const normalizedEmail = (email || "").trim().toLowerCase();
+  const cleanCode = (otpCode || "").trim();
+
+  if (!normalizedEmail || !cleanCode) {
+    return { success: false, message: "Email and 6-digit OTP code are required." };
+  }
+
+  const stored = memoryActivationOtpCodes.get(normalizedEmail);
+  if (!stored) {
+    return { success: false, message: "No verification request found for this email, or code has expired. Please request a new code." };
+  }
+
+  if (Date.now() > stored.expiresAt) {
+    memoryActivationOtpCodes.delete(normalizedEmail);
+    return { success: false, message: "Verification code has expired. Please request a new code." };
+  }
+
+  if (stored.code !== cleanCode) {
+    return { success: false, message: "Invalid verification code. Please check and try again." };
+  }
+
+  // OTP is Verified! Remove OTP from cache
+  memoryActivationOtpCodes.delete(normalizedEmail);
+
+  // 1. Generate High-Entropy Random Password
+  const randomChars = crypto.randomBytes(6).toString("base64").replace(/[+/=]/g, "k");
+  const generatedPassword = `cd_${randomChars}!2026`;
+  const salt = bcrypt.genSaltSync(12);
+  const passwordHash = bcrypt.hashSync(generatedPassword, salt);
+
+  // 2. Generate Unique License Key
+  const licenseKey = `CD-LIC-${crypto.randomBytes(8).toString("hex").toUpperCase()}`;
+
+  // 3. Create or update user
+  const newUser: SystemUser = {
+    id: `usr_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+    email: normalizedEmail,
+    password_hash: passwordHash,
+    role: "instance_owner",
+    full_name: `Verified Cloner (${stored.city || "Global"})`,
+    is_root_owner: false,
+    is_active: true,
+    created_at: new Date().toISOString(),
+  };
+
+  memoryUsers.set(normalizedEmail, newUser);
+
+  // 4. Register instance
+  const newInstance: RegisteredInstance = {
+    id: `inst_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`,
+    license_key: licenseKey,
+    owner_email: normalizedEmail,
+    machine_id: stored.machineId,
+    city: stored.city || "Local",
+    country: stored.country || "Global",
+    last_ip: stored.ipAddress || "127.0.0.1",
+    last_heartbeat: new Date().toISOString(),
+    is_revoked: false,
+    created_at: new Date().toISOString(),
+  };
+
+  memoryInstances.set(licenseKey, newInstance);
+
+  // 5. Record approved access request
+  const reqId = `req_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`;
+  const accessReq: AccessRequest = {
+    id: reqId,
+    requester_email: normalizedEmail,
+    machine_id: stored.machineId,
+    ip_address: stored.ipAddress || "127.0.0.1",
+    country: stored.country || "Global",
+    city: stored.city || "Local",
+    device_os: stored.deviceOs || process.platform || "unknown_os",
+    status: "approved",
+    assigned_license_key: licenseKey,
+    created_at: new Date().toISOString(),
+    reviewed_at: new Date().toISOString(),
+    reviewed_by: "email_otp_verified",
+  };
+  memoryAccessRequests.set(reqId, accessReq);
+
+  // Persist to Supabase
+  try {
+    await supabase.from("system_users").upsert({
+      email: newUser.email,
+      password_hash: newUser.password_hash,
+      role: newUser.role,
+      full_name: newUser.full_name,
+      is_root_owner: false,
+      is_active: true,
+    }, { onConflict: "email" });
+
+    await supabase.from("registered_instances").insert({
+      license_key: newInstance.license_key,
+      owner_email: newInstance.owner_email,
+      machine_id: newInstance.machine_id,
+      city: newInstance.city,
+      country: newInstance.country,
+      last_ip: newInstance.last_ip,
+      is_revoked: false,
+    });
+
+    await supabase.from("access_requests").insert({
+      id: reqId,
+      requester_email: accessReq.requester_email,
+      machine_id: accessReq.machine_id,
+      ip_address: accessReq.ip_address,
+      country: accessReq.country,
+      city: accessReq.city,
+      device_os: accessReq.device_os,
+      status: "approved",
+      assigned_license_key: licenseKey,
+      reviewed_at: accessReq.reviewed_at,
+    });
+  } catch (err: any) {
+    console.warn("[security] auto-approval persist notice:", err.message);
+  }
+
+  // 6. Send automated credentials email to user via Resend
+  if (resendClient && config.resend.apiKey) {
+    try {
+      await resendClient.emails.send({
+        from: config.resend.fromEmail || "no-reply@career-digest.online",
+        to: normalizedEmail,
+        subject: "🎉 Your Career-Digest Login Credentials & License Key",
+        html: `
+          <div style="font-family:sans-serif; background:#0f172a; color:#fff; padding:2rem; border-radius:12px; max-width:600px; margin:auto;">
+            <h2 style="color:#38bdf8; margin-top:0;">Email Verified & Instance Activated</h2>
+            <p>Your real email has been verified. Here are your credentials to log in to <strong>Career-Digest</strong>:</p>
+            
+            <div style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); padding:1.25rem; border-radius:10px; margin:1.5rem 0;">
+              <p style="margin:0 0 0.65rem 0;"><strong>Login Email:</strong> <code style="color:#34d399; font-size:1.05rem;">${normalizedEmail}</code></p>
+              <p style="margin:0 0 0.65rem 0;"><strong>Generated Password:</strong> <code style="color:#fbbf24; font-size:1.2rem; font-weight:bold;">${generatedPassword}</code></p>
+              <p style="margin:0;"><strong>License Key:</strong> <code style="color:#a5b4fc;">${licenseKey}</code></p>
+            </div>
+
+            <p style="font-size:0.85rem; color:#94a3b8; line-height:1.5;">You can now return to the login screen and sign in with this password. All your upcoming memories, websites, reading logs, and AI chat copilot sessions will be isolated to your account.</p>
+            <hr style="border:none; border-top:1px solid rgba(255,255,255,0.1); margin:1.5rem 0;" />
+            <p style="font-size:0.75rem; color:#64748b;">Project Owner: Abhishek Tiwari · Jaipur, India · abhishektiwari1540@gmail.com</p>
+          </div>
+        `,
+      });
+      console.log(`[security] Credentials email dispatched via Resend to ${normalizedEmail}`);
+
+      // Also notify Abhishek Tiwari
+      await resendClient.emails.send({
+        from: config.resend.fromEmail || "no-reply@career-digest.online",
+        to: "abhishektiwari1540@gmail.com",
+        subject: `🔔 Verified Node Activation: ${normalizedEmail} (${stored.city || "Local"}, ${stored.country || "India"})`,
+        html: `
+          <div style="font-family:sans-serif; background:#0f172a; color:#fff; padding:1.5rem; border-radius:10px;">
+            <h3 style="color:#34d399; margin-top:0;">New Verified Instance Registered</h3>
+            <p>A new real user has verified their email via OTP and activated their node:</p>
+            <ul>
+              <li><strong>Email:</strong> ${normalizedEmail}</li>
+              <li><strong>Location:</strong> ${stored.city || "Unknown"}, ${stored.country || "Global"}</li>
+              <li><strong>IP:</strong> ${stored.ipAddress || "Unknown"}</li>
+              <li><strong>Machine ID:</strong> ${stored.machineId}</li>
+              <li><strong>License:</strong> ${licenseKey}</li>
+            </ul>
+          </div>
+        `,
+      }).catch(() => {});
+    } catch (mailErr: any) {
+      console.warn("[security] Email dispatch notice:", mailErr.message);
+    }
+  }
+
+  return {
+    success: true,
+    message: "Email verified successfully! Your auto-generated password and license key have been dispatched to your email address.",
+    email: normalizedEmail,
+  };
+}
+
+/**
  * Submit First-Run Access / Activation Request from a Cloned Instance
  */
 export async function submitAccessRequest(data: {
@@ -405,6 +743,15 @@ export async function submitAccessRequest(data: {
   const email = (data.requesterEmail || "").trim().toLowerCase();
   if (!email || !email.includes("@")) {
     return { success: false, message: "Valid email address is required" };
+  }
+
+  // Disposable check
+  const check = isDisposableEmail(email);
+  if (check.isDisposable) {
+    return {
+      success: false,
+      message: `Disposable and temporary email addresses (@${check.domain}) are strictly prohibited. Please provide a genuine, verifiable email address.`,
+    };
   }
 
   const requestId = `req_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
