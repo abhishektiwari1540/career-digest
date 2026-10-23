@@ -60,6 +60,14 @@ import { processLinkedInZipArchive } from "./storage/zipImporter.js";
 import { searchGoogleApi } from "./collectors/googleSearchEngine.js";
 import { generatePersonalSeoAnalysis } from "./llm/seoProfileEngine.js";
 import {
+  getUserWebsites,
+  addUserWebsite,
+  deleteUserWebsite,
+  getWebsiteById,
+  regenerateWebsiteSeo,
+  initDefaultWebsites,
+} from "./storage/userWebsites.js";
+import {
   forceTriggerSelfUpdate,
   getSelfUpdatingStatus,
   setSelfUpdatingActive,
@@ -117,6 +125,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 initSecurityEngine();
+initDefaultWebsites();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 150 * 1024 * 1024 } });
 
 app.use(express.json());
@@ -906,9 +915,17 @@ app.post("/api/seo/sync", async (req, res) => {
   }
 });
 
-// GET /api/seo/sync - Retrieve synchronized SEO metadata (Used by client receiver script on https://www.abhishektiwari.online/)
+// GET /api/seo/sync - Retrieve synchronized SEO metadata (supports optional ?siteId=...)
 app.get("/api/seo/sync", async (req, res) => {
   try {
+    const siteId = (req.query.siteId as string)?.trim();
+    if (siteId) {
+      const site = await getWebsiteById(siteId);
+      if (site) {
+        return res.json({ success: true, siteId: site.id, siteUrl: site.site_url, pages: site.pages_seo });
+      }
+    }
+
     const records = await fetchSeoMetadataRecords();
     
     // If store is empty, trigger initial generation
@@ -966,6 +983,121 @@ app.get("/api/seo/sync", async (req, res) => {
     res.json({ success: true, pages: records });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/seo/embed/:siteId - Public script endpoint for dynamic SEO injection
+app.get("/api/seo/embed/:siteId", async (req, res) => {
+  try {
+    const { siteId } = req.params;
+    const site = await getWebsiteById(siteId);
+    if (!site) {
+      return res.status(404).json({ success: false, error: "Website not found or not registered" });
+    }
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({
+      success: true,
+      siteId: site.id,
+      siteName: site.site_name,
+      siteUrl: site.site_url,
+      pages: site.pages_seo,
+      updatedAt: site.updated_at,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/seo/websites - List websites for authenticated user
+app.get("/api/seo/websites", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Token required" });
+    }
+    const token = authHeader.split(" ")[1];
+    const verified = verifyAuthToken(token);
+    if (!verified.valid || !verified.user) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+
+    const sites = await getUserWebsites(verified.user.email, verified.user.role);
+    res.json({ success: true, websites: sites });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/seo/websites - Add new website for authenticated user
+app.post("/api/seo/websites", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Token required" });
+    }
+    const token = authHeader.split(" ")[1];
+    const verified = verifyAuthToken(token);
+    if (!verified.valid || !verified.user) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+
+    const { siteName, siteUrl, siteDescription, targetKeywords } = req.body;
+    if (!siteName || !siteUrl) {
+      return res.status(400).json({ success: false, error: "Website Name and Website URL are required." });
+    }
+
+    const newSite = await addUserWebsite(verified.user.email, {
+      siteName,
+      siteUrl,
+      siteDescription,
+      targetKeywords: Array.isArray(targetKeywords) ? targetKeywords : undefined,
+    });
+
+    res.json({ success: true, website: newSite, message: `Website ${newSite.site_name} added successfully!` });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/seo/websites/:id/generate - Regenerate SEO metadata for specific website
+app.post("/api/seo/websites/:id/generate", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Token required" });
+    }
+    const token = authHeader.split(" ")[1];
+    const verified = verifyAuthToken(token);
+    if (!verified.valid || !verified.user) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+
+    const { id } = req.params;
+    const updatedSite = await regenerateWebsiteSeo(id, verified.user.email, verified.user.role);
+    res.json({ success: true, website: updatedSite, message: "SEO metadata refreshed and optimized!" });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/seo/websites/:id - Remove website
+app.delete("/api/seo/websites/:id", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Token required" });
+    }
+    const token = authHeader.split(" ")[1];
+    const verified = verifyAuthToken(token);
+    if (!verified.valid || !verified.user) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+
+    const { id } = req.params;
+    const deleted = await deleteUserWebsite(id, verified.user.email, verified.user.role);
+    res.json({ success: deleted, message: deleted ? "Website removed successfully" : "Failed to remove website" });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 

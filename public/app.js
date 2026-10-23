@@ -1,4 +1,15 @@
 document.addEventListener("DOMContentLoaded", () => {
+  // Global Auth & Omniscient Telemetry State (Strict Zero-Trust Gatekeeper)
+  let currentAuthUser = null;
+  let currentAuthToken = localStorage.getItem("cd_auth_token") || "";
+  let clientTelemetryGeo = { city: "Jaipur", country: "India", ip: "127.0.0.1" };
+  let clientMachineId = localStorage.getItem("cd_machine_id") || "";
+  if (!clientMachineId) {
+    clientMachineId = "MAC_" + Math.random().toString(36).substring(2, 10).toUpperCase();
+    localStorage.setItem("cd_machine_id", clientMachineId);
+  }
+  let sessionDataStarted = false;
+
   // Global State
   let activeTab = "tab-chat";
   let cachedMemories = [];
@@ -30,6 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
         loadMemories();
       } else if (targetTab === "tab-seo") {
         loadSeoProfile();
+        loadUserWebsites();
       } else if (targetTab === "tab-read") {
         loadReadingSection();
       } else if (targetTab === "tab-platforms") {
@@ -44,12 +56,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Initial Data Fetch
-  initAuthAndTelemetry();
-  fetchStats();
-  initSelfUpdatingEngineWatcher();
-  initChatCopilot();
-  loadOpenSourceTab(false);
+  // Strict Zero-Trust Gatekeeper Initialization
+  // (Zero personal data, stats, or chats load before successful authentication)
+  initAuthGatekeeper();
 
   // Dropzone & File Ingestion Setup
   const dropzone = document.getElementById("dropzone");
@@ -1172,128 +1181,385 @@ document.addEventListener("DOMContentLoaded", () => {
       console.warn("Stats fetch warning:", err);
     }
     loadReadingHistory();
-    initSeoSyncHandlers();
+    loadUserWebsites();
   }
 
-  // Website SEO Synchronization UI Handlers (For https://www.abhishektiwari.online/)
-  function initSeoSyncHandlers() {
-    const syncHeaderBtn = document.getElementById("sync-website-seo-btn");
-    const syncMainBtn = document.getElementById("seo-sync-main-btn");
-    const statusContainer = document.getElementById("seo-sync-status-container");
-    const statusHeader = document.getElementById("seo-sync-status-header");
-    const pagesBreakdown = document.getElementById("seo-sync-pages-breakdown");
-    const copyCodeBtn = document.getElementById("copy-receiver-code-btn");
+  // =========================================================================
+  // MULTI-WEBSITE SEO ENGINE & DYNAMIC LIVE EMBED INJECTION
+  // =========================================================================
+  let userWebsites = [];
+  let currentActiveWebsiteId = "site_abhishek_portfolio";
+  let multiWebsiteHandlersBound = false;
 
-    async function triggerWebsiteSeoSync(btnEl) {
+  async function loadUserWebsites() {
+    const selector = document.getElementById("seo-website-selector");
+    if (!selector) return;
+
+    try {
+      const headers = {};
+      if (currentAuthToken) headers["Authorization"] = `Bearer ${currentAuthToken}`;
+      const res = await fetch("/api/seo/websites", { headers });
+      const data = await res.json();
+
+      if (data.success && Array.isArray(data.websites) && data.websites.length > 0) {
+        userWebsites = data.websites;
+      }
+    } catch (err) {
+      console.warn("[loadUserWebsites] Notice:", err.message);
+    }
+
+    if (!userWebsites || userWebsites.length === 0) {
+      userWebsites = [{
+        id: "site_abhishek_portfolio",
+        owner_email: "abhishektiwari1540@gmail.com",
+        site_name: "Abhishek Tiwari - Portfolio & Second Brain",
+        site_url: "https://www.abhishektiwari.online/",
+        site_description: "Official Portfolio of Abhishek Tiwari - Senior Backend Developer (Node.js, TypeScript, Express) & AI LLM Integration Specialist.",
+        target_keywords: [
+          "Abhishek Tiwari developer",
+          "Node.js Backend Developer Jaipur",
+          "TypeScript AI Engineer",
+          "Express.js Microservices",
+          "Gemini Vector Search"
+        ],
+        pages_seo: {
+          "/": {
+            page_route: "/",
+            meta_title: "Abhishek Tiwari | Senior Backend Developer (Node.js, Express, TypeScript) & AI Engineer",
+            meta_description: "Official Portfolio of Abhishek Tiwari - Senior Backend Developer & AI LLM Integration Specialist building high-concurrency Node.js microservices and Gemini vector search engines.",
+            meta_keywords: "Abhishek Tiwari, Senior Backend Developer, Node.js, TypeScript, Express.js, AI Engineer",
+            structured_jsonld: { "@context": "https://schema.org", "@type": "Person", "name": "Abhishek Tiwari" }
+          },
+          "/about": {
+            page_route: "/about",
+            meta_title: "About Abhishek Tiwari | Senior Backend Developer & Systems Architect",
+            meta_description: "Learn about Abhishek Tiwari's technical background, 3+ years engineering scalable backend systems with Node.js, Laravel, and LLM integrations.",
+            meta_keywords: "About Abhishek Tiwari, Backend Architect",
+            structured_jsonld: { "@context": "https://schema.org", "@type": "AboutPage", "name": "About Abhishek Tiwari" }
+          },
+          "/#contact": {
+            page_route: "/#contact",
+            meta_title: "Contact Abhishek Tiwari | Hire Senior Backend & AI Engineer",
+            meta_description: "Get in touch with Abhishek Tiwari for senior backend engineering roles, AI consulting, or high-throughput microservices architecture.",
+            meta_keywords: "Contact Abhishek Tiwari, Hire Node.js Developer",
+            structured_jsonld: { "@context": "https://schema.org", "@type": "ContactPage", "name": "Contact Abhishek Tiwari" }
+          }
+        }
+      }];
+    }
+
+    if (!userWebsites.some(w => w.id === currentActiveWebsiteId)) {
+      currentActiveWebsiteId = userWebsites[0].id;
+    }
+
+    selector.innerHTML = userWebsites.map(w => `
+      <option value="${escapeAttr(w.id)}" ${w.id === currentActiveWebsiteId ? "selected" : ""}>
+        ${escapeHtml(w.site_name)} (${escapeHtml(w.site_url)})
+      </option>
+    `).join("");
+
+    renderActiveWebsite();
+    initMultiWebsiteSeoHandlers();
+  }
+
+  function renderActiveWebsite() {
+    const site = userWebsites.find(w => w.id === currentActiveWebsiteId) || userWebsites[0];
+    if (!site) return;
+
+    const nameEl = document.getElementById("active-site-display-name");
+    const urlEl = document.getElementById("active-site-display-url");
+    const ownerBadge = document.getElementById("active-site-owner-badge");
+    const descEl = document.getElementById("active-site-display-desc");
+    const keywordsEl = document.getElementById("active-site-display-keywords");
+    const embedSiteLabel = document.getElementById("embed-site-label");
+    const receiverCodeText = document.getElementById("receiver-code-text");
+    const deleteBtn = document.getElementById("seo-delete-website-btn");
+    const pagesCountEl = document.getElementById("active-site-pages-count");
+    const pagesBreakdown = document.getElementById("seo-sync-pages-breakdown");
+
+    if (nameEl) nameEl.textContent = site.site_name;
+    if (urlEl) {
+      urlEl.href = site.site_url;
+      urlEl.innerHTML = `<span>↗ Visit ${escapeHtml(site.site_url)}</span>`;
+    }
+    if (ownerBadge) {
+      ownerBadge.textContent = `Owner: ${site.owner_email || 'You'}`;
+    }
+    if (descEl) {
+      descEl.textContent = site.site_description || "No description provided.";
+    }
+    if (keywordsEl) {
+      const kw = Array.isArray(site.target_keywords) ? site.target_keywords : [];
+      keywordsEl.innerHTML = kw.length > 0
+        ? kw.map(k => `<span class="keyword-tag">⚡ ${escapeHtml(k)}</span>`).join("")
+        : `<span style="font-size:0.75rem; color:var(--text-muted);">No custom keywords set</span>`;
+    }
+
+    if (embedSiteLabel) {
+      embedSiteLabel.textContent = site.site_url;
+    }
+    if (receiverCodeText) {
+      receiverCodeText.innerHTML = `<code>&lt;script src="https://career-digest.vercel.app/seo-sync.js" data-site-id="${escapeHtml(site.id)}" async&gt;&lt;/script&gt;</code>`;
+    }
+
+    if (deleteBtn) {
+      deleteBtn.style.display = (site.id === "site_abhishek_portfolio") ? "none" : "inline-flex";
+    }
+
+    const pages = site.pages_seo || {};
+    const pageKeys = Object.keys(pages);
+    if (pagesCountEl) {
+      pagesCountEl.textContent = `${pageKeys.length} route${pageKeys.length === 1 ? '' : 's'} configured`;
+    }
+
+    if (pagesBreakdown) {
+      if (pageKeys.length === 0) {
+        pagesBreakdown.innerHTML = `<div style="padding:1.25rem; background:rgba(0,0,0,0.25); border-radius:8px; color:var(--text-muted); font-size:0.85rem; grid-column: 1 / -1;">
+          No page SEO generated yet for this website. Click <strong>"⚡ Regenerate & Sync SEO"</strong> above to auto-generate Meta Tags & Schema for Home, About, and Contact pages!
+        </div>`;
+      } else {
+        pagesBreakdown.innerHTML = pageKeys.map(route => {
+          const p = pages[route] || {};
+          return `
+            <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:1rem; display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                  <span style="font-weight:700; color:#10b981; font-size:0.88rem; font-family:monospace; background:rgba(16,185,129,0.12); padding:0.2rem 0.5rem; border-radius:4px;">
+                    ${escapeHtml(route)}
+                  </span>
+                  <span class="status-pill free" style="font-size:0.68rem;">LIVE SYNCHRONIZED</span>
+                </div>
+                <div style="font-size:0.85rem; color:#fff; font-weight:600; margin-bottom:0.35rem; line-height:1.3;">
+                  ${escapeHtml(p.meta_title || 'Untitled Page')}
+                </div>
+                <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; line-height:1.4;">
+                  <strong>Description:</strong> ${escapeHtml(p.meta_description || 'No description set')}
+                </div>
+                <div style="font-size:0.74rem; color:var(--accent-cyan); margin-bottom:0.4rem;">
+                  <strong>Keywords:</strong> ${escapeHtml(p.meta_keywords ? (p.meta_keywords.length > 80 ? p.meta_keywords.slice(0, 80) + '...' : p.meta_keywords) : 'Default')}
+                </div>
+              </div>
+              <div style="margin-top:0.6rem; padding-top:0.5rem; border-top:1px solid rgba(255,255,255,0.06); font-size:0.72rem; color:#a5b4fc; display:flex; justify-content:space-between; align-items:center;">
+                <span>Schema: ${escapeHtml(p.structured_jsonld?.["@type"] || "WebPage")}</span>
+                <span style="color:#38bdf8;">OG Card Ready ✓</span>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+    }
+  }
+
+  function initMultiWebsiteSeoHandlers() {
+    if (multiWebsiteHandlersBound) return;
+    multiWebsiteHandlersBound = true;
+
+    const selector = document.getElementById("seo-website-selector");
+    const syncMainBtn = document.getElementById("seo-sync-main-btn");
+    const syncHeaderBtn = document.getElementById("sync-website-seo-btn");
+    const deleteBtn = document.getElementById("seo-delete-website-btn");
+    const copyEmbedBtn = document.getElementById("copy-receiver-code-btn");
+    const addSiteBtn = document.getElementById("seo-add-website-btn");
+
+    const addModal = document.getElementById("add-website-modal");
+    const closeAddModalBtn = document.getElementById("close-add-website-modal-btn");
+    const modalSubmitBtn = document.getElementById("modal-add-website-submit");
+    const modalNameInput = document.getElementById("modal-website-name");
+    const modalUrlInput = document.getElementById("modal-website-url");
+    const modalKeywordsInput = document.getElementById("modal-website-keywords");
+    const modalDescInput = document.getElementById("modal-website-desc");
+    const modalError = document.getElementById("modal-add-website-error");
+
+    if (selector) {
+      selector.addEventListener("change", (e) => {
+        currentActiveWebsiteId = e.target.value;
+        renderActiveWebsite();
+      });
+    }
+
+    if (copyEmbedBtn) {
+      copyEmbedBtn.addEventListener("click", () => {
+        const snippetEl = document.getElementById("receiver-code-text");
+        const scriptCode = snippetEl ? snippetEl.innerText.trim() : "";
+        if (scriptCode) {
+          navigator.clipboard.writeText(scriptCode).then(() => {
+            const orig = copyEmbedBtn.innerHTML;
+            copyEmbedBtn.innerHTML = "✅ Copied Script!";
+            setTimeout(() => { copyEmbedBtn.innerHTML = orig; }, 2500);
+          });
+        }
+      });
+    }
+
+    if (addSiteBtn && addModal) {
+      addSiteBtn.addEventListener("click", () => {
+        addModal.style.display = "flex";
+        if (modalError) modalError.style.display = "none";
+      });
+    }
+
+    if (closeAddModalBtn && addModal) {
+      closeAddModalBtn.addEventListener("click", () => {
+        addModal.style.display = "none";
+      });
+    }
+
+    if (addModal) {
+      addModal.addEventListener("click", (e) => {
+        if (e.target === addModal) addModal.style.display = "none";
+      });
+    }
+
+    if (modalSubmitBtn) {
+      modalSubmitBtn.addEventListener("click", async () => {
+        const siteName = modalNameInput?.value?.trim();
+        const siteUrl = modalUrlInput?.value?.trim();
+        const siteKeywords = (modalKeywordsInput?.value || "").split(",").map(s => s.trim()).filter(Boolean);
+        const siteDesc = modalDescInput?.value?.trim();
+
+        if (!siteName || !siteUrl) {
+          if (modalError) {
+            modalError.textContent = "Please enter both Website Name and URL/Domain.";
+            modalError.style.display = "block";
+          }
+          return;
+        }
+
+        modalSubmitBtn.disabled = true;
+        modalSubmitBtn.textContent = "Creating Website & Generating SEO...";
+        if (modalError) modalError.style.display = "none";
+
+        try {
+          const headers = { "Content-Type": "application/json" };
+          if (currentAuthToken) headers["Authorization"] = `Bearer ${currentAuthToken}`;
+
+          const res = await fetch("/api/seo/websites", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              siteName,
+              siteUrl,
+              siteDescription: siteDesc,
+              targetKeywords: siteKeywords,
+            }),
+          });
+          const data = await res.json();
+
+          if (data.success && data.website) {
+            currentActiveWebsiteId = data.website.id;
+            await loadUserWebsites();
+            if (addModal) addModal.style.display = "none";
+
+            if (modalNameInput) modalNameInput.value = "";
+            if (modalUrlInput) modalUrlInput.value = "";
+            if (modalKeywordsInput) modalKeywordsInput.value = "";
+            if (modalDescInput) modalDescInput.value = "";
+
+            alert(`🎉 Website "${data.website.site_name}" added successfully!\n\nYour unique dynamic embed script is ready.`);
+          } else {
+            throw new Error(data.error || "Failed to add website");
+          }
+        } catch (err) {
+          if (modalError) {
+            modalError.textContent = err.message;
+            modalError.style.display = "block";
+          }
+        } finally {
+          modalSubmitBtn.disabled = false;
+          modalSubmitBtn.textContent = "🚀 Save Website & Generate Embed Script";
+        }
+      });
+    }
+
+    async function handleRegenerateSeo(btnEl) {
       if (btnEl) {
         btnEl.disabled = true;
-        btnEl.innerHTML = `<span>⏳</span> Syncing Website SEO...`;
-      }
-
-      if (statusContainer) {
-        statusContainer.style.display = "block";
-        statusHeader.innerHTML = `⏳ Triggering SEO Sync for target site: <strong>https://www.abhishektiwari.online/</strong>...`;
-        pagesBreakdown.innerHTML = `<p class="placeholder-text">Generating Meta Tags, OpenGraph & JSON-LD schemas for Home (/), About (/about), and Contact (/#contact)...</p>`;
+        btnEl.innerHTML = `<span>⏳</span> Regenerating SEO...`;
       }
 
       try {
-        const res = await fetch("/api/seo/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ targetSite: "https://www.abhishektiwari.online/" }),
-        });
+        const headers = { "Content-Type": "application/json" };
+        if (currentAuthToken) headers["Authorization"] = `Bearer ${currentAuthToken}`;
 
+        const res = await fetch(`/api/seo/websites/${currentActiveWebsiteId}/generate`, {
+          method: "POST",
+          headers,
+        });
         const data = await res.json();
 
-        if (res.ok && data.success) {
-          if (statusHeader) {
-            statusHeader.innerHTML = `🎉 SEO Metadata Synchronized & Persisted in Supabase (table: <code>seo_metadata</code>)!`;
+        if (data.success && data.website) {
+          const idx = userWebsites.findIndex(w => w.id === currentActiveWebsiteId);
+          if (idx !== -1) {
+            userWebsites[idx] = data.website;
           }
+          renderActiveWebsite();
 
-          if (pagesBreakdown && data.pages) {
-            let html = "";
-            Object.keys(data.pages).forEach((route) => {
-              const item = data.pages[route];
-              html += `
-                <div style="background:rgba(15,23,42,0.7); border:1px solid rgba(16,185,129,0.3); border-radius:8px; padding:0.9rem;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
-                    <span style="font-weight:700; color:#10b981; font-size:0.88rem;">📄 Page: ${escapeHtml(route)}</span>
-                    <span class="status-pill free" style="font-size:0.7rem;">READY FOR RECEIVER</span>
-                  </div>
-                  <div style="font-size:0.83rem; color:#fff; font-weight:600; margin-bottom:0.3rem;">
-                    Title: ${escapeHtml(item.meta_title)}
-                  </div>
-                  <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.4rem; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-                    <strong>Description:</strong> ${escapeHtml(item.meta_description)}
-                  </div>
-                  <div style="font-size:0.72rem; color:var(--accent-cyan);">
-                    <strong>Keywords:</strong> ${escapeHtml(item.meta_keywords ? item.meta_keywords.slice(0, 100) + '...' : '')}
-                  </div>
-                </div>
-              `;
-            });
-            pagesBreakdown.innerHTML = html;
-          }
-
-          if (syncHeaderBtn) {
-            syncHeaderBtn.innerHTML = `<span>✅</span> SEO Synced!`;
+          if (btnEl) {
+            btnEl.innerHTML = `<span>✅</span> SEO Updated!`;
             setTimeout(() => {
-              syncHeaderBtn.disabled = false;
-              syncHeaderBtn.innerHTML = `<span>🌐</span> Sync SEO to Website`;
-            }, 3000);
-          }
-
-          if (syncMainBtn) {
-            syncMainBtn.innerHTML = `<span>✅</span> Sync Complete!`;
-            setTimeout(() => {
-              syncMainBtn.disabled = false;
-              syncMainBtn.innerHTML = `<span>⚡</span> Trigger Website SEO Sync Now`;
+              btnEl.disabled = false;
+              btnEl.innerHTML = `<span>⚡</span> Regenerate & Sync SEO`;
             }, 3000);
           }
         } else {
-          const errText = data.error || "Failed to sync SEO metadata";
-          if (statusHeader) statusHeader.innerHTML = `❌ SEO Sync Error: ${escapeHtml(errText)}`;
-          if (syncHeaderBtn) {
-            syncHeaderBtn.disabled = false;
-            syncHeaderBtn.innerHTML = `<span>🌐</span> Sync SEO to Website`;
-          }
-          if (syncMainBtn) {
-            syncMainBtn.disabled = false;
-            syncMainBtn.innerHTML = `<span>⚡</span> Trigger Website SEO Sync Now`;
-          }
+          throw new Error(data.error || "Failed to regenerate SEO");
         }
       } catch (err) {
-        if (statusHeader) statusHeader.innerHTML = `❌ Network Error: ${escapeHtml(err.message)}`;
-        if (syncHeaderBtn) {
-          syncHeaderBtn.disabled = false;
-          syncHeaderBtn.innerHTML = `<span>🌐</span> Sync SEO to Website`;
-        }
-        if (syncMainBtn) {
-          syncMainBtn.disabled = false;
-          syncMainBtn.innerHTML = `<span>⚡</span> Trigger Website SEO Sync Now`;
+        alert(`Error syncing SEO: ${err.message}`);
+        if (btnEl) {
+          btnEl.disabled = false;
+          btnEl.innerHTML = `<span>⚡</span> Regenerate & Sync SEO`;
         }
       }
+    }
+
+    if (syncMainBtn) {
+      syncMainBtn.addEventListener("click", () => handleRegenerateSeo(syncMainBtn));
     }
 
     if (syncHeaderBtn) {
       syncHeaderBtn.addEventListener("click", () => {
         const seoTabBtn = document.querySelector('.tab-btn[data-tab="tab-seo"]');
         if (seoTabBtn) seoTabBtn.click();
-        triggerWebsiteSeoSync(syncHeaderBtn);
+        handleRegenerateSeo(syncHeaderBtn);
       });
     }
 
-    if (syncMainBtn) {
-      syncMainBtn.addEventListener("click", () => triggerWebsiteSeoSync(syncMainBtn));
-    }
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", async () => {
+        const site = userWebsites.find(w => w.id === currentActiveWebsiteId);
+        if (!site) return;
 
-    if (copyCodeBtn) {
-      copyCodeBtn.addEventListener("click", () => {
-        const codeText = document.getElementById("receiver-code-text")?.textContent || `<script src="https://career-digest.vercel.app/seo-sync.js"></script>`;
-        navigator.clipboard.writeText(codeText).then(() => {
-          copyCodeBtn.textContent = "✅ Copied!";
-          setTimeout(() => { copyCodeBtn.textContent = "📋 Copy Code"; }, 2000);
-        });
+        if (!confirm(`Are you sure you want to remove website "${site.site_name}"? Embedded scripts on that domain will stop serving dynamic SEO.`)) {
+          return;
+        }
+
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = "Removing...";
+
+        try {
+          const headers = {};
+          if (currentAuthToken) headers["Authorization"] = `Bearer ${currentAuthToken}`;
+
+          const res = await fetch(`/api/seo/websites/${currentActiveWebsiteId}`, {
+            method: "DELETE",
+            headers,
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            currentActiveWebsiteId = "site_abhishek_portfolio";
+            await loadUserWebsites();
+            alert("Website removed successfully.");
+          } else {
+            throw new Error(data.error || "Failed to delete website");
+          }
+        } catch (err) {
+          alert(`Failed to delete website: ${err.message}`);
+        } finally {
+          deleteBtn.disabled = false;
+          deleteBtn.textContent = "🗑️ Remove";
+        }
       });
     }
   }
@@ -3071,18 +3337,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // =========================================================================
   // MASTER HYBRID SECURITY, RBAC & OMNISCIENT TELEMETRY CONTROLLERS
   // =========================================================================
-  let currentAuthUser = null;
-  let currentAuthToken = localStorage.getItem("cd_auth_token") || "";
-  let clientTelemetryGeo = { city: "Jaipur", country: "India", ip: "127.0.0.1" };
-  let clientMachineId = localStorage.getItem("cd_machine_id") || "";
-
-  if (!clientMachineId) {
-    clientMachineId = "MAC_" + Math.random().toString(36).substring(2, 10).toUpperCase();
-    localStorage.setItem("cd_machine_id", clientMachineId);
-  }
-
-  async function initAuthAndTelemetry() {
-    // 1. Fetch Geolocation in background for handshake
+  // =========================================================================
+  // MASTER ZERO-TRUST SECURITY GATEKEEPER & AUTHENTICATED SESSION ENGINE
+  // =========================================================================
+  async function initAuthGatekeeper() {
+    // 1. Fetch Geolocation in background for handshake telemetry
     try {
       const geoController = new AbortController();
       const geoTimeout = setTimeout(() => geoController.abort(), 2500);
@@ -3096,16 +3355,22 @@ document.addEventListener("DOMContentLoaded", () => {
           ip: geoData.ip || "127.0.0.1",
         };
       }
-    } catch (e) {
-      // offline / fallback
-    }
+    } catch {}
 
     const detectedElem = document.getElementById("detected-telemetry-text");
     if (detectedElem) {
       detectedElem.textContent = `📍 ${clientTelemetryGeo.city}, ${clientTelemetryGeo.country} · IP: ${clientTelemetryGeo.ip} · Node: ${clientMachineId}`;
     }
+    const gateDetectedElem = document.getElementById("gate-detected-telemetry-text");
+    if (gateDetectedElem) {
+      gateDetectedElem.textContent = `📍 ${clientTelemetryGeo.city}, ${clientTelemetryGeo.country} · IP: ${clientTelemetryGeo.ip} · Node: ${clientMachineId}`;
+    }
 
-    // 2. Validate Existing Session
+    // 2. Setup Event Listeners for Gatekeeper & In-Dashboard Modal
+    setupGatekeeperEventListeners();
+    setupInDashboardAuthModal();
+
+    // 3. Validate Existing Session (Strict zero data leakage before authentication)
     if (currentAuthToken) {
       try {
         const meRes = await fetch("/api/auth/me", {
@@ -3114,26 +3379,388 @@ document.addEventListener("DOMContentLoaded", () => {
         const meData = await meRes.json();
         if (meData.success && meData.user) {
           currentAuthUser = meData.user;
-          updateAuthUI();
-        } else {
-          // Token expired or revoked
-          logoutUser(false);
+          unlockAuthenticatedDashboard();
+          return;
         }
       } catch (err) {
-        // network issue, try cached user
         try {
           const cached = JSON.parse(localStorage.getItem("cd_auth_user") || "null");
-          if (cached) {
+          if (cached && cached.email) {
             currentAuthUser = cached;
-            updateAuthUI();
+            unlockAuthenticatedDashboard();
+            return;
           }
         } catch {}
       }
-    } else {
-      updateAuthUI();
     }
 
-    // 3. Modal Controls
+    // Not authenticated: enforce gatekeeper screen
+    lockDownUnauthenticatedGatekeeper();
+  }
+
+  function unlockAuthenticatedDashboard() {
+    const gatekeeper = document.getElementById("auth-gatekeeper-screen");
+    const dashboard = document.getElementById("authenticated-dashboard-container");
+
+    if (gatekeeper) gatekeeper.style.display = "none";
+    if (dashboard) dashboard.style.display = "block";
+
+    updateAuthUI();
+    startAuthenticatedDashboardSession();
+  }
+
+  function lockDownUnauthenticatedGatekeeper() {
+    currentAuthUser = null;
+    currentAuthToken = "";
+    sessionDataStarted = false;
+    localStorage.removeItem("cd_auth_token");
+    localStorage.removeItem("cd_auth_user");
+
+    const gatekeeper = document.getElementById("auth-gatekeeper-screen");
+    const dashboard = document.getElementById("authenticated-dashboard-container");
+
+    if (dashboard) dashboard.style.display = "none";
+    if (gatekeeper) gatekeeper.style.display = "flex";
+
+    updateAuthUI();
+  }
+
+  function startAuthenticatedDashboardSession() {
+    if (sessionDataStarted) return;
+    sessionDataStarted = true;
+
+    fetchStats();
+    initSelfUpdatingEngineWatcher();
+    initChatCopilot();
+    loadOpenSourceTab(false);
+    loadUserWebsites();
+  }
+
+  function setupGatekeeperEventListeners() {
+    // Gatekeeper Tab Switching
+    const gateTabLogin = document.getElementById("gate-tab-login-btn");
+    const gateTabActivate = document.getElementById("gate-tab-activate-btn");
+    const gateTabReset = document.getElementById("gate-tab-reset-btn");
+    const gateForgotLink = document.getElementById("gate-forgot-password-link");
+
+    const gateFormLogin = document.getElementById("gate-login-form-container");
+    const gateFormActivate = document.getElementById("gate-activate-form-container");
+    const gateFormReset = document.getElementById("gate-reset-form-container");
+
+    function switchGateTab(tabName) {
+      if (gateTabLogin) gateTabLogin.classList.toggle("active", tabName === "login");
+      if (gateTabActivate) gateTabActivate.classList.toggle("active", tabName === "activate");
+      if (gateTabReset) gateTabReset.classList.toggle("active", tabName === "reset");
+
+      if (gateFormLogin) gateFormLogin.style.display = tabName === "login" ? "block" : "none";
+      if (gateFormActivate) gateFormActivate.style.display = tabName === "activate" ? "block" : "none";
+      if (gateFormReset) gateFormReset.style.display = tabName === "reset" ? "block" : "none";
+    }
+
+    if (gateTabLogin) gateTabLogin.onclick = () => switchGateTab("login");
+    if (gateTabActivate) gateTabActivate.onclick = () => switchGateTab("activate");
+    if (gateTabReset) gateTabReset.onclick = () => switchGateTab("reset");
+    if (gateForgotLink) {
+      gateForgotLink.onclick = () => {
+        switchGateTab("reset");
+        const loginEmail = document.getElementById("gate-login-email")?.value?.trim();
+        const resetEmail = document.getElementById("gate-reset-email");
+        if (loginEmail && resetEmail) resetEmail.value = loginEmail;
+      };
+    }
+
+    // Gatekeeper Sign In Submit
+    const gateLoginBtn = document.getElementById("gate-login-submit-btn");
+    const gateEmailInput = document.getElementById("gate-login-email");
+    const gatePasswordInput = document.getElementById("gate-login-password");
+    const gateErrorMsg = document.getElementById("gate-login-error-msg");
+
+    if (gateLoginBtn) {
+      gateLoginBtn.onclick = async () => {
+        const email = gateEmailInput?.value?.trim();
+        const password = gatePasswordInput?.value?.trim();
+
+        if (!email || !password) {
+          if (gateErrorMsg) {
+            gateErrorMsg.textContent = "Please enter both email and password.";
+            gateErrorMsg.style.display = "block";
+          }
+          return;
+        }
+
+        gateLoginBtn.disabled = true;
+        gateLoginBtn.textContent = "Verifying Credentials...";
+        if (gateErrorMsg) gateErrorMsg.style.display = "none";
+
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+          const data = await res.json();
+
+          if (data.success && data.token) {
+            currentAuthToken = data.token;
+            currentAuthUser = data.user;
+            localStorage.setItem("cd_auth_token", data.token);
+            localStorage.setItem("cd_auth_user", JSON.stringify(data.user));
+
+            unlockAuthenticatedDashboard();
+
+            if (data.user.role === "projectadmin") {
+              const adminTab = document.getElementById("admin-tab-btn");
+              if (adminTab) adminTab.style.display = "flex";
+            }
+          } else {
+            throw new Error(data.error || "Authentication failed. Check your password.");
+          }
+        } catch (err) {
+          if (gateErrorMsg) {
+            gateErrorMsg.textContent = err.message;
+            gateErrorMsg.style.display = "block";
+          }
+        } finally {
+          gateLoginBtn.disabled = false;
+          gateLoginBtn.textContent = "Sign In & Unlock Knowledge Engine";
+        }
+      };
+    }
+
+    // Gatekeeper Clone Activation Request Submit
+    const gateReqBtn = document.getElementById("gate-req-submit-btn");
+    const gateReqEmail = document.getElementById("gate-req-email");
+    const gateReqStatusMsg = document.getElementById("gate-req-status-msg");
+
+    if (gateReqBtn) {
+      gateReqBtn.onclick = async () => {
+        const email = gateReqEmail?.value?.trim();
+        if (!email || !email.includes("@")) {
+          if (gateReqStatusMsg) {
+            gateReqStatusMsg.style.color = "#f87171";
+            gateReqStatusMsg.textContent = "Please provide a valid email address.";
+            gateReqStatusMsg.style.display = "block";
+          }
+          return;
+        }
+
+        gateReqBtn.disabled = true;
+        gateReqBtn.textContent = "Submitting Handshake...";
+        if (gateReqStatusMsg) gateReqStatusMsg.style.display = "none";
+
+        try {
+          const res = await fetch("/api/activation/request", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              requesterEmail: email,
+              machineId: clientMachineId,
+              city: clientTelemetryGeo.city,
+              country: clientTelemetryGeo.country,
+              deviceOs: navigator.platform || "browser",
+            }),
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            if (gateReqStatusMsg) {
+              gateReqStatusMsg.style.color = "#34d399";
+              gateReqStatusMsg.textContent = "✅ " + data.message;
+              gateReqStatusMsg.style.display = "block";
+            }
+          } else {
+            throw new Error(data.message || "Failed to submit request.");
+          }
+        } catch (err) {
+          if (gateReqStatusMsg) {
+            gateReqStatusMsg.style.color = "#f87171";
+            gateReqStatusMsg.textContent = "Error: " + err.message;
+            gateReqStatusMsg.style.display = "block";
+          }
+        } finally {
+          gateReqBtn.disabled = false;
+          gateReqBtn.textContent = "🚀 Submit Request to Abhishek Tiwari";
+        }
+      };
+    }
+
+    // Gatekeeper Password Reset Flow
+    const gateSendCodeBtn = document.getElementById("gate-send-code-btn");
+    const gateResetEmail = document.getElementById("gate-reset-email");
+    const gateResetStep1 = document.getElementById("gate-reset-step1");
+    const gateResetStep2 = document.getElementById("gate-reset-step2");
+    const gateResetStep1Msg = document.getElementById("gate-reset-step1-msg");
+    const gateResetTargetEmail = document.getElementById("gate-reset-target-email");
+    const gateResetCode = document.getElementById("gate-reset-code");
+    const gateResetNewPass = document.getElementById("gate-reset-newpass");
+    const gateResetConfirmPass = document.getElementById("gate-reset-confirmpass");
+    const gateConfirmResetBtn = document.getElementById("gate-confirm-reset-btn");
+    const gateResetStep2Msg = document.getElementById("gate-reset-step2-msg");
+    const gateResetBackBtn = document.getElementById("gate-reset-back-btn");
+    const gateResetResendBtn = document.getElementById("gate-reset-resend-btn");
+
+    let gateCurrentResetEmail = "";
+
+    if (gateSendCodeBtn) {
+      gateSendCodeBtn.onclick = async () => {
+        const email = gateResetEmail?.value?.trim();
+        if (!email || !email.includes("@")) {
+          if (gateResetStep1Msg) {
+            gateResetStep1Msg.style.color = "#f87171";
+            gateResetStep1Msg.textContent = "Please enter a valid registered email address.";
+            gateResetStep1Msg.style.display = "block";
+          }
+          return;
+        }
+
+        gateCurrentResetEmail = email;
+        gateSendCodeBtn.disabled = true;
+        gateSendCodeBtn.textContent = "Sending OTP...";
+        if (gateResetStep1Msg) gateResetStep1Msg.style.display = "none";
+
+        try {
+          const res = await fetch("/api/auth/forgot-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: gateCurrentResetEmail }),
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            if (gateResetTargetEmail) gateResetTargetEmail.textContent = gateCurrentResetEmail;
+            if (gateResetStep1) gateResetStep1.style.display = "none";
+            if (gateResetStep2) gateResetStep2.style.display = "block";
+            if (data.debugCode && gateResetCode) {
+              gateResetCode.value = data.debugCode;
+            }
+            if (gateResetStep2Msg) {
+              gateResetStep2Msg.style.color = data.debugCode ? "#38bdf8" : "#34d399";
+              gateResetStep2Msg.textContent = data.debugCode
+                ? `[Dev Mode] Verification OTP: ${data.debugCode}`
+                : "A 6-digit OTP code has been dispatched to your email.";
+              gateResetStep2Msg.style.display = "block";
+            }
+          } else {
+            throw new Error(data.message || "Failed to dispatch reset code.");
+          }
+        } catch (err) {
+          if (gateResetStep1Msg) {
+            gateResetStep1Msg.style.color = "#f87171";
+            gateResetStep1Msg.textContent = err.message;
+            gateResetStep1Msg.style.display = "block";
+          }
+        } finally {
+          gateSendCodeBtn.disabled = false;
+          gateSendCodeBtn.textContent = "✉️ Send 6-Digit OTP Code";
+        }
+      };
+    }
+
+    if (gateResetBackBtn) {
+      gateResetBackBtn.onclick = () => {
+        if (gateResetStep2) gateResetStep2.style.display = "none";
+        if (gateResetStep1) gateResetStep1.style.display = "block";
+      };
+    }
+
+    if (gateResetResendBtn) {
+      gateResetResendBtn.onclick = async () => {
+        if (!gateCurrentResetEmail) return;
+        gateResetResendBtn.textContent = "Resending...";
+        try {
+          const res = await fetch("/api/auth/forgot-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: gateCurrentResetEmail }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            if (data.debugCode && gateResetCode) gateResetCode.value = data.debugCode;
+            if (gateResetStep2Msg) {
+              gateResetStep2Msg.style.color = "#34d399";
+              gateResetStep2Msg.textContent = data.debugCode ? `[Dev Mode] New OTP: ${data.debugCode}` : "A fresh OTP code has been sent.";
+              gateResetStep2Msg.style.display = "block";
+            }
+          }
+        } catch {}
+        gateResetResendBtn.textContent = "Resend OTP";
+      };
+    }
+
+    if (gateConfirmResetBtn) {
+      gateConfirmResetBtn.onclick = async () => {
+        const code = gateResetCode?.value?.trim();
+        const newPassword = gateResetNewPass?.value?.trim();
+        const confirmPassword = gateResetConfirmPass?.value?.trim();
+
+        if (!code || code.length !== 6) {
+          if (gateResetStep2Msg) {
+            gateResetStep2Msg.style.color = "#f87171";
+            gateResetStep2Msg.textContent = "Please enter the 6-digit verification code.";
+            gateResetStep2Msg.style.display = "block";
+          }
+          return;
+        }
+
+        if (!newPassword || newPassword.length < 6) {
+          if (gateResetStep2Msg) {
+            gateResetStep2Msg.style.color = "#f87171";
+            gateResetStep2Msg.textContent = "Password must be at least 6 characters long.";
+            gateResetStep2Msg.style.display = "block";
+          }
+          return;
+        }
+
+        if (newPassword !== confirmPassword) {
+          if (gateResetStep2Msg) {
+            gateResetStep2Msg.style.color = "#f87171";
+            gateResetStep2Msg.textContent = "Passwords do not match.";
+            gateResetStep2Msg.style.display = "block";
+          }
+          return;
+        }
+
+        gateConfirmResetBtn.disabled = true;
+        gateConfirmResetBtn.textContent = "Saving New Password...";
+        if (gateResetStep2Msg) gateResetStep2Msg.style.display = "none";
+
+        try {
+          const res = await fetch("/api/auth/reset-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: gateCurrentResetEmail,
+              resetCode: code,
+              newPassword: newPassword,
+            }),
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            alert("🎉 " + (data.message || "Password updated successfully! You can now sign in."));
+            switchGateTab("login");
+            if (gateEmailInput) gateEmailInput.value = gateCurrentResetEmail;
+            if (gatePasswordInput) gatePasswordInput.value = newPassword;
+            if (gateResetStep2) gateResetStep2.style.display = "none";
+            if (gateResetStep1) gateResetStep1.style.display = "block";
+          } else {
+            throw new Error(data.message || data.error || "Password reset failed.");
+          }
+        } catch (err) {
+          if (gateResetStep2Msg) {
+            gateResetStep2Msg.style.color = "#f87171";
+            gateResetStep2Msg.textContent = err.message;
+            gateResetStep2Msg.style.display = "block";
+          }
+        } finally {
+          gateConfirmResetBtn.disabled = false;
+          gateConfirmResetBtn.textContent = "🔒 Confirm & Save New Password";
+        }
+      };
+    }
+  }
+
+  function setupInDashboardAuthModal() {
     const authModal = document.getElementById("auth-modal");
     const openAuthBtn = document.getElementById("open-auth-modal-btn");
     const closeAuthBtn = document.getElementById("close-auth-modal-btn");
@@ -3165,7 +3792,6 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-    // Switch between Sign In, Request Activation, and Password Reset tabs
     const tabLoginBtn = document.getElementById("auth-tab-login-btn");
     const tabActivateBtn = document.getElementById("auth-tab-activate-btn");
     const tabResetBtn = document.getElementById("auth-tab-reset-btn");
@@ -3174,7 +3800,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const formActivate = document.getElementById("auth-activate-form-container");
     const formReset = document.getElementById("auth-reset-form-container");
 
-    function showAuthTab(activeTabName) {
+    function showModalAuthTab(activeTabName) {
       if (tabLoginBtn) tabLoginBtn.classList.toggle("active", activeTabName === "login");
       if (tabActivateBtn) tabActivateBtn.classList.toggle("active", activeTabName === "activate");
       if (tabResetBtn) tabResetBtn.classList.toggle("active", activeTabName === "reset");
@@ -3184,21 +3810,19 @@ document.addEventListener("DOMContentLoaded", () => {
       if (formReset) formReset.style.display = activeTabName === "reset" ? "block" : "none";
     }
 
-    if (tabLoginBtn) tabLoginBtn.onclick = () => showAuthTab("login");
-    if (tabActivateBtn) tabActivateBtn.onclick = () => showAuthTab("activate");
-    if (tabResetBtn) tabResetBtn.onclick = () => showAuthTab("reset");
+    if (tabLoginBtn) tabLoginBtn.onclick = () => showModalAuthTab("login");
+    if (tabActivateBtn) tabActivateBtn.onclick = () => showModalAuthTab("activate");
+    if (tabResetBtn) tabResetBtn.onclick = () => showModalAuthTab("reset");
     if (forgotPasswordLink) {
       forgotPasswordLink.onclick = () => {
-        showAuthTab("reset");
+        showModalAuthTab("reset");
         const loginEmail = document.getElementById("login-input-email")?.value?.trim();
         const resetEmail = document.getElementById("modal-reset-email");
-        if (loginEmail && resetEmail) {
-          resetEmail.value = loginEmail;
-        }
+        if (loginEmail && resetEmail) resetEmail.value = loginEmail;
       };
     }
 
-    // 4. Sign In Form Handler
+    // Modal Login
     const loginSubmitBtn = document.getElementById("login-submit-btn");
     const loginEmailInput = document.getElementById("login-input-email");
     const loginPasswordInput = document.getElementById("login-input-password");
@@ -3208,19 +3832,10 @@ document.addEventListener("DOMContentLoaded", () => {
       loginSubmitBtn.onclick = async () => {
         const email = loginEmailInput?.value?.trim();
         const password = loginPasswordInput?.value?.trim();
-
-        if (!email || !password) {
-          if (loginErrorMsg) {
-            loginErrorMsg.textContent = "Please enter both email and password.";
-            loginErrorMsg.style.display = "block";
-          }
-          return;
-        }
+        if (!email || !password) return;
 
         loginSubmitBtn.disabled = true;
         loginSubmitBtn.textContent = "Verifying...";
-        if (loginErrorMsg) loginErrorMsg.style.display = "none";
-
         try {
           const res = await fetch("/api/auth/login", {
             method: "POST",
@@ -3228,22 +3843,14 @@ document.addEventListener("DOMContentLoaded", () => {
             body: JSON.stringify({ email, password }),
           });
           const data = await res.json();
-
           if (data.success && data.token) {
             currentAuthToken = data.token;
             currentAuthUser = data.user;
             localStorage.setItem("cd_auth_token", data.token);
             localStorage.setItem("cd_auth_user", JSON.stringify(data.user));
-
             updateAuthUI();
             if (authModal) authModal.style.display = "none";
-
-            alert(`🎉 Welcome ${data.user.full_name || data.user.email}! Role: ${data.user.role}`);
-
-            if (data.user.role === "projectadmin") {
-              const adminTab = document.getElementById("admin-tab-btn");
-              if (adminTab) adminTab.click();
-            }
+            startAuthenticatedDashboardSession();
           } else {
             throw new Error(data.error || "Login failed");
           }
@@ -3259,7 +3866,7 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-    // 5. Clone Activation Request Handler
+    // Modal Clone Request
     const reqSubmitBtn = document.getElementById("req-submit-btn");
     const reqEmailInput = document.getElementById("req-input-email");
     const reqStatusMsg = document.getElementById("req-status-msg");
@@ -3267,19 +3874,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (reqSubmitBtn) {
       reqSubmitBtn.onclick = async () => {
         const email = reqEmailInput?.value?.trim();
-        if (!email || !email.includes("@")) {
-          if (reqStatusMsg) {
-            reqStatusMsg.style.color = "#f87171";
-            reqStatusMsg.textContent = "Please enter a valid email address.";
-            reqStatusMsg.style.display = "block";
-          }
-          return;
-        }
+        if (!email || !email.includes("@")) return;
 
         reqSubmitBtn.disabled = true;
-        reqSubmitBtn.textContent = "Transmitting Handshake Request...";
-        if (reqStatusMsg) reqStatusMsg.style.display = "none";
-
+        reqSubmitBtn.textContent = "Transmitting...";
         try {
           const res = await fetch("/api/activation/request", {
             method: "POST",
@@ -3293,16 +3891,10 @@ document.addEventListener("DOMContentLoaded", () => {
             }),
           });
           const data = await res.json();
-
-          if (data.success) {
-            if (reqStatusMsg) {
-              reqStatusMsg.style.color = "#34d399";
-              reqStatusMsg.textContent = "✅ " + data.message;
-              reqStatusMsg.style.display = "block";
-            }
-            alert(`🎉 Request Transmitted!\n\n${data.message}`);
-          } else {
-            throw new Error(data.message || "Failed to submit request.");
+          if (data.success && reqStatusMsg) {
+            reqStatusMsg.style.color = "#34d399";
+            reqStatusMsg.textContent = "✅ " + data.message;
+            reqStatusMsg.style.display = "block";
           }
         } catch (err) {
           if (reqStatusMsg) {
@@ -3313,205 +3905,6 @@ document.addEventListener("DOMContentLoaded", () => {
         } finally {
           reqSubmitBtn.disabled = false;
           reqSubmitBtn.textContent = "🚀 Submit Request to Abhishek Tiwari";
-        }
-      };
-    }
-
-    // 6. Password Reset Handlers inside Modal
-    const modalSendCodeBtn = document.getElementById("modal-send-code-btn");
-    const modalResetEmail = document.getElementById("modal-reset-email");
-    const modalResetStep1Msg = document.getElementById("modal-reset-step1-msg");
-    const modalResetStep1 = document.getElementById("modal-reset-step1");
-    const modalResetStep2 = document.getElementById("modal-reset-step2");
-    const modalResetTargetEmail = document.getElementById("modal-reset-target-email");
-    const modalResetCode = document.getElementById("modal-reset-code");
-    const modalResetNewPass = document.getElementById("modal-reset-newpass");
-    const modalResetConfirmPass = document.getElementById("modal-reset-confirmpass");
-    const modalConfirmResetBtn = document.getElementById("modal-confirm-reset-btn");
-    const modalResetStep2Msg = document.getElementById("modal-reset-step2-msg");
-    const modalResetBackBtn = document.getElementById("modal-reset-back-btn");
-    const modalResetResendBtn = document.getElementById("modal-reset-resend-btn");
-
-    let currentResetEmail = "";
-
-    async function handleModalSendCode() {
-      const email = modalResetEmail?.value?.trim();
-      if (!email || !email.includes("@")) {
-        if (modalResetStep1Msg) {
-          modalResetStep1Msg.style.color = "#f87171";
-          modalResetStep1Msg.textContent = "Please enter a valid email address.";
-          modalResetStep1Msg.style.display = "block";
-        }
-        return;
-      }
-
-      currentResetEmail = email;
-      if (modalSendCodeBtn) {
-        modalSendCodeBtn.disabled = true;
-        modalSendCodeBtn.textContent = "Sending OTP...";
-      }
-      if (modalResetStep1Msg) modalResetStep1Msg.style.display = "none";
-
-      try {
-        const res = await fetch("/api/auth/forgot-password", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: currentResetEmail }),
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          if (modalResetTargetEmail) modalResetTargetEmail.textContent = currentResetEmail;
-          if (modalResetStep1) modalResetStep1.style.display = "none";
-          if (modalResetStep2) modalResetStep2.style.display = "block";
-          if (modalResetCode) {
-            modalResetCode.value = data.debugCode || "";
-            modalResetCode.focus();
-          }
-          if (modalResetStep2Msg) {
-            if (data.debugCode) {
-              modalResetStep2Msg.style.color = "#38bdf8";
-              modalResetStep2Msg.textContent = `[Dev Mode] Verification code: ${data.debugCode}`;
-            } else {
-              modalResetStep2Msg.style.color = "#34d399";
-              modalResetStep2Msg.textContent = data.message || "OTP code sent to your email!";
-            }
-            modalResetStep2Msg.style.display = "block";
-          }
-        } else {
-          throw new Error(data.message || data.error || "Failed to send reset code.");
-        }
-      } catch (err) {
-        if (modalResetStep1Msg) {
-          modalResetStep1Msg.style.color = "#f87171";
-          modalResetStep1Msg.textContent = err.message;
-          modalResetStep1Msg.style.display = "block";
-        }
-      } finally {
-        if (modalSendCodeBtn) {
-          modalSendCodeBtn.disabled = false;
-          modalSendCodeBtn.textContent = "✉️ Send 6-Digit OTP Code";
-        }
-      }
-    }
-
-    if (modalSendCodeBtn) modalSendCodeBtn.onclick = handleModalSendCode;
-
-    if (modalResetBackBtn) {
-      modalResetBackBtn.onclick = () => {
-        if (modalResetStep2) modalResetStep2.style.display = "none";
-        if (modalResetStep1) modalResetStep1.style.display = "block";
-      };
-    }
-
-    if (modalResetResendBtn) {
-      modalResetResendBtn.onclick = async () => {
-        if (!currentResetEmail) return;
-        modalResetResendBtn.textContent = "Resending...";
-        try {
-          const res = await fetch("/api/auth/forgot-password", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email: currentResetEmail }),
-          });
-          const data = await res.json();
-          if (data.success) {
-            if (modalResetStep2Msg) {
-              modalResetStep2Msg.style.color = "#34d399";
-              modalResetStep2Msg.textContent = data.debugCode
-                ? `[Dev Mode] New code: ${data.debugCode}`
-                : "A new 6-digit OTP code has been dispatched to your email.";
-              modalResetStep2Msg.style.display = "block";
-            }
-            if (data.debugCode && modalResetCode) modalResetCode.value = data.debugCode;
-          } else {
-            throw new Error(data.message || "Failed to resend code.");
-          }
-        } catch (err) {
-          if (modalResetStep2Msg) {
-            modalResetStep2Msg.style.color = "#f87171";
-            modalResetStep2Msg.textContent = err.message;
-            modalResetStep2Msg.style.display = "block";
-          }
-        } finally {
-          modalResetResendBtn.textContent = "Resend OTP";
-        }
-      };
-    }
-
-    if (modalConfirmResetBtn) {
-      modalConfirmResetBtn.onclick = async () => {
-        const code = modalResetCode?.value?.trim();
-        const newPassword = modalResetNewPass?.value?.trim();
-        const confirmPassword = modalResetConfirmPass?.value?.trim();
-
-        if (!code || code.length !== 6) {
-          if (modalResetStep2Msg) {
-            modalResetStep2Msg.style.color = "#f87171";
-            modalResetStep2Msg.textContent = "Please enter the 6-digit OTP code.";
-            modalResetStep2Msg.style.display = "block";
-          }
-          return;
-        }
-
-        if (!newPassword || newPassword.length < 6) {
-          if (modalResetStep2Msg) {
-            modalResetStep2Msg.style.color = "#f87171";
-            modalResetStep2Msg.textContent = "New password must be at least 6 characters long.";
-            modalResetStep2Msg.style.display = "block";
-          }
-          return;
-        }
-
-        if (newPassword !== confirmPassword) {
-          if (modalResetStep2Msg) {
-            modalResetStep2Msg.style.color = "#f87171";
-            modalResetStep2Msg.textContent = "Passwords do not match.";
-            modalResetStep2Msg.style.display = "block";
-          }
-          return;
-        }
-
-        modalConfirmResetBtn.disabled = true;
-        modalConfirmResetBtn.textContent = "Updating Password...";
-        if (modalResetStep2Msg) modalResetStep2Msg.style.display = "none";
-
-        try {
-          const res = await fetch("/api/auth/reset-password", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: currentResetEmail,
-              resetCode: code,
-              newPassword: newPassword,
-            }),
-          });
-          const data = await res.json();
-
-          if (data.success) {
-            alert("🎉 " + (data.message || "Password updated successfully!"));
-            showAuthTab("login");
-            const loginEmailInput = document.getElementById("login-input-email");
-            const loginPasswordInput = document.getElementById("login-input-password");
-            if (loginEmailInput) loginEmailInput.value = currentResetEmail;
-            if (loginPasswordInput) loginPasswordInput.value = newPassword;
-            if (modalResetStep2) modalResetStep2.style.display = "none";
-            if (modalResetStep1) modalResetStep1.style.display = "block";
-            if (modalResetCode) modalResetCode.value = "";
-            if (modalResetNewPass) modalResetNewPass.value = "";
-            if (modalResetConfirmPass) modalResetConfirmPass.value = "";
-          } else {
-            throw new Error(data.message || data.error || "Password reset failed.");
-          }
-        } catch (err) {
-          if (modalResetStep2Msg) {
-            modalResetStep2Msg.style.color = "#f87171";
-            modalResetStep2Msg.textContent = err.message;
-            modalResetStep2Msg.style.display = "block";
-          }
-        } finally {
-          modalConfirmResetBtn.disabled = false;
-          modalConfirmResetBtn.textContent = "🔒 Confirm & Save New Password";
         }
       };
     }
@@ -3543,7 +3936,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (openAuthBtn) openAuthBtn.style.display = "none";
       if (logoutBtn) logoutBtn.style.display = "flex";
 
-      // Show Admin Control Center only to projectadmin
       if (adminTabBtn) {
         adminTabBtn.style.display = currentAuthUser.role === "projectadmin" ? "flex" : "none";
       }
@@ -3556,20 +3948,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function logoutUser(alertUser = true) {
-    currentAuthUser = null;
-    currentAuthToken = "";
-    localStorage.removeItem("cd_auth_token");
-    localStorage.removeItem("cd_auth_user");
-    updateAuthUI();
+    lockDownUnauthenticatedGatekeeper();
 
-    // If currently on admin tab, switch to chat
+    // Reset metrics on UI
+    const statLinkedin = document.getElementById("stat-linkedin-posts");
+    const statMemories = document.getElementById("stat-brain-memories");
+    const statVectors = document.getElementById("stat-multimodal-vectors");
+    const statReadingTime = document.getElementById("stat-reading-time");
+    if (statLinkedin) statLinkedin.textContent = "0";
+    if (statMemories) statMemories.textContent = "0";
+    if (statVectors) statVectors.textContent = "0";
+    if (statReadingTime) statReadingTime.textContent = "0m";
+
     if (activeTab === "tab-admin") {
       const chatTab = document.querySelector('.tab-btn[data-tab="tab-chat"]');
       if (chatTab) chatTab.click();
     }
 
     if (alertUser) {
-      alert("You have been signed out.");
+      alert("You have been securely signed out.");
     }
   }
 

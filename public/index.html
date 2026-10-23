@@ -13,7 +13,145 @@
   <div class="glow-bg glow-1"></div>
   <div class="glow-bg glow-2"></div>
 
-  <div class="app-container">
+  <!-- ============================================================ -->
+  <!-- 1. FULL-SCREEN AUTHENTICATION GATEKEEPER SCREEN (DEFAULT VIEW) -->
+  <!-- ============================================================ -->
+  <div id="auth-gatekeeper-screen" style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 1.5rem; position: relative; z-index: 10;">
+    <div class="modal-card" style="max-width: 520px; width: 100%; border-radius: 20px; box-shadow: 0 25px 60px -15px rgba(0,0,0,0.8), 0 0 35px -5px rgba(99,102,241,0.25);">
+      <div class="modal-head" style="padding: 1.5rem 1.75rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; align-items:center; gap:0.75rem;">
+          <div class="logo-icon" style="width:48px; height:48px; font-size:1.8rem; border-radius:12px;">🧠</div>
+          <div>
+            <h2 style="margin:0; font-family:'Outfit',sans-serif; color:#fff; font-size:1.35rem; line-height:1.2;">AI Second Brain</h2>
+            <span style="font-size:0.75rem; color:#38bdf8; letter-spacing:0.5px; text-transform:uppercase; font-weight:600;">Zero-Trust Security Gateway</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gatekeeper Tabs Switcher -->
+      <div style="display:flex; gap:0.4rem; padding:0.75rem 1.25rem; background:rgba(0,0,0,0.25); border-bottom:1px solid rgba(255,255,255,0.06);">
+        <button class="chip-btn active" id="gate-tab-login-btn" style="flex:1; text-align:center; font-size:0.82rem; padding:0.45rem 0.6rem;">Sign In</button>
+        <button class="chip-btn" id="gate-tab-activate-btn" style="flex:1; text-align:center; font-size:0.82rem; padding:0.45rem 0.6rem;">Clone Access</button>
+        <button class="chip-btn" id="gate-tab-reset-btn" style="flex:1; text-align:center; font-size:0.82rem; padding:0.45rem 0.6rem;">Reset Password</button>
+      </div>
+
+      <div class="modal-body" style="padding:1.5rem;">
+        <!-- Gate Form 1: Sign In -->
+        <div id="gate-login-form-container">
+          <div style="background:rgba(99,102,241,0.08); border-left:3px solid #6366f1; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#c7d2fe; margin-bottom:1.25rem;">
+            🔒 <strong>Protected Knowledge Engine:</strong> Please authenticate to access your personal second brain, AI copilot, vector memory, and SEO synchronization hub.
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem; font-weight:500;">Email Address</label>
+            <input type="email" id="gate-login-email" placeholder="abhishektiwari1540@gmail.com" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.9rem;" />
+          </div>
+
+          <div style="margin-bottom:0.4rem;">
+            <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem; font-weight:500;">Password</label>
+            <input type="password" id="gate-login-password" placeholder="••••••••" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.9rem;" />
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+            <span style="font-size:0.75rem; color:#64748b;">Root Seed: <code>12345678</code></span>
+            <button type="button" id="gate-forgot-password-link" style="background:none; border:none; color:#38bdf8; font-size:0.78rem; cursor:pointer; text-decoration:underline; padding:0;">
+              Forgot Password?
+            </button>
+          </div>
+
+          <div id="gate-login-error-msg" style="display:none; color:#f87171; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+          <button class="btn primary-btn" id="gate-login-submit-btn" style="width:100%; padding:0.75rem; font-weight:700; background:linear-gradient(135deg, #6366f1, #4f46e5); font-size:0.95rem; box-shadow:0 6px 20px rgba(99,102,241,0.35);">
+            Sign In &amp; Unlock Knowledge Engine
+          </button>
+        </div>
+
+        <!-- Gate Form 2: Request Clone Activation -->
+        <div id="gate-activate-form-container" style="display:none;">
+          <div style="background:rgba(245,158,11,0.08); border-left:3px solid #f59e0b; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#fde68a; margin-bottom:1rem;">
+            ⚡ <strong>Cloned Instance Handshake:</strong> Request an authorized instance license from project owner <strong>Abhishek Tiwari</strong>.
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Your Email Address</label>
+            <input type="email" id="gate-req-email" placeholder="developer@example.com" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.9rem;" />
+          </div>
+
+          <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:0.75rem; margin-bottom:1.25rem;">
+            <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; margin-bottom:0.3rem;">📡 Machine Telemetry Capture</div>
+            <div style="font-size:0.78rem; color:#38bdf8;" id="gate-detected-telemetry-text">📍 Fetching your IP &amp; Geolocation...</div>
+          </div>
+
+          <div id="gate-req-status-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+          <button class="btn primary-btn" id="gate-req-submit-btn" style="width:100%; padding:0.75rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.95rem;">
+            🚀 Submit Request to Abhishek Tiwari
+          </button>
+        </div>
+
+        <!-- Gate Form 3: Password Reset Flow -->
+        <div id="gate-reset-form-container" style="display:none;">
+          <div id="gate-reset-step1">
+            <div style="background:rgba(56,189,248,0.08); border-left:3px solid #38bdf8; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#bae6fd; margin-bottom:1rem;">
+              🔑 <strong>Password Reset Verification:</strong> Enter your email to receive a 6-digit OTP code.
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Registered Email Address</label>
+              <input type="email" id="gate-reset-email" placeholder="abhishektiwari1540@gmail.com" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.9rem;" />
+            </div>
+
+            <div id="gate-reset-step1-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+            <button class="btn primary-btn" id="gate-send-code-btn" style="width:100%; padding:0.7rem; font-weight:700; background:linear-gradient(135deg, #0ea5e9, #0284c7); font-size:0.92rem; margin-bottom:0.75rem;">
+              ✉️ Send 6-Digit OTP Code
+            </button>
+          </div>
+
+          <div id="gate-reset-step2" style="display:none;">
+            <div style="background:rgba(16,185,129,0.08); border-left:3px solid #10b981; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#a7f3d0; margin-bottom:1rem;">
+              ✓ Code sent to <strong id="gate-reset-target-email" style="color:#fff;"></strong>. Enter the OTP and your new password.
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">6-Digit Verification Code</label>
+              <input type="text" id="gate-reset-code" maxlength="6" placeholder="••••••" style="width:100%; font-family:monospace; font-size:1.3rem; letter-spacing:6px; text-align:center; background:rgba(15,23,42,0.9); border:1px solid rgba(52,211,153,0.5); color:#34d399; padding:0.5rem; border-radius:8px;" />
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">New Password (min 6 chars)</label>
+              <input type="password" id="gate-reset-newpass" placeholder="••••••••" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.9rem;" />
+            </div>
+
+            <div style="margin-bottom:1.25rem;">
+              <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Confirm New Password</label>
+              <input type="password" id="gate-reset-confirmpass" placeholder="••••••••" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.9rem;" />
+            </div>
+
+            <div id="gate-reset-step2-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+            <button class="btn primary-btn" id="gate-confirm-reset-btn" style="width:100%; padding:0.7rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.92rem;">
+              🔒 Confirm &amp; Save New Password
+            </button>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.9rem; font-size:0.78rem;">
+              <button type="button" id="gate-reset-back-btn" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0;">
+                ← Change Email
+              </button>
+              <button type="button" id="gate-reset-resend-btn" style="background:none; border:none; color:#38bdf8; cursor:pointer; padding:0; text-decoration:underline;">
+                Resend OTP
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- 2. AUTHENTICATED DASHBOARD CONTAINER (SHOWN ONLY AFTER LOGIN) -->
+  <!-- ============================================================ -->
+  <div class="app-container" id="authenticated-dashboard-container" style="display:none;">
     <!-- Header Section -->
     <header class="main-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
       <div class="brand">
@@ -367,32 +505,88 @@
             </div>
           </div>
 
-          <!-- WEBSITE SEO SYNC CONTROL PANEL (For https://www.abhishektiwari.online/) -->
-          <div style="margin-top: 1.5rem; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); padding: 1.5rem; border-radius: 14px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1rem;">
+          <!-- MULTI-WEBSITE SEO COMMAND CENTER & DYNAMIC EMBED GENERATOR -->
+          <div style="margin-top: 1.5rem; background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.28); padding: 1.5rem; border-radius: 16px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);">
+            <!-- Header with Add Website Button -->
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
               <div>
-                <span style="font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:#10b981; font-weight:700;">🌐 LIVE WEBSITE SEO SYNCHRONIZATION HUB</span>
-                <h3 style="font-family:'Outfit',sans-serif; color:#fff; margin-top:0.25rem;">Sync & Auto-Apply SEO to <code>https://www.abhishektiwari.online/</code></h3>
-                <p style="font-size:0.88rem; color:var(--text-muted); margin-top:0.25rem;">Generates, saves to database table <code>seo_metadata</code>, and applies optimized Meta Tags, OpenGraph & JSON-LD to <strong>Home (<code>/</code>)</strong>, <strong>About (<code>/about</code>)</strong>, and <strong>Contact (<code>/#contact</code>)</strong> pages.</p>
+                <span style="font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:#10b981; font-weight:700;">🌐 MULTI-WEBSITE SEO ENGINE & UNIVERSAL EMBED</span>
+                <h3 style="font-family:'Outfit',sans-serif; color:#fff; margin-top:0.25rem; font-size:1.35rem;">Manage Websites & Dynamic Live SEO Injections</h3>
+                <p style="font-size:0.86rem; color:var(--text-muted); margin-top:0.25rem;">Add multiple domains or client projects. Each website gets customized SEO meta tags and a zero-maintenance dynamic 1-line script tag.</p>
               </div>
-              <button class="btn primary-btn" id="seo-sync-main-btn" style="background:linear-gradient(135deg, #10b981, #059669); border:none; padding:0.6rem 1.2rem; font-weight:700; display:flex; align-items:center; gap:0.5rem; box-shadow:0 4px 15px rgba(16,185,129,0.4);">
-                <span>⚡</span> Trigger Website SEO Sync Now
+              <button class="btn primary-btn" id="seo-add-website-btn" style="background:linear-gradient(135deg, #10b981, #059669); border:none; padding:0.55rem 1.1rem; font-weight:700; display:flex; align-items:center; gap:0.45rem; box-shadow:0 4px 15px rgba(16,185,129,0.35);">
+                <span>➕</span> Add New Website
               </button>
             </div>
 
-            <!-- Sync Output & Receiver Code Preview Container -->
-            <div id="seo-sync-status-container" style="display:none; margin-top:1.25rem; background:rgba(0,0,0,0.3); border:1px solid var(--card-border); border-radius:10px; padding:1.25rem;">
-              <div id="seo-sync-status-header" style="font-weight:700; color:#10b981; font-size:1rem; margin-bottom:0.75rem;"></div>
-              <div id="seo-sync-pages-breakdown" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem; margin-bottom:1.25rem;"></div>
-              
-              <!-- Integration Instructions & Code Snippet -->
-              <div style="background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:1rem;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
-                  <strong style="color:var(--accent-cyan); font-size:0.88rem;">📦 Copy-Paste Receiver Code Snippet for <code>https://www.abhishektiwari.online/</code></strong>
-                  <button class="btn secondary-btn" id="copy-receiver-code-btn" style="padding:0.25rem 0.6rem; font-size:0.75rem;">📋 Copy Code</button>
+            <!-- Website Selector & Action Controls -->
+            <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:1rem 1.25rem; margin-bottom:1.25rem; display:flex; align-items:center; flex-wrap:wrap; gap:1rem; justify-content:space-between;">
+              <div style="display:flex; align-items:center; gap:0.75rem; flex:1; min-width:280px;">
+                <label for="seo-website-selector" style="font-size:0.82rem; color:var(--text-muted); font-weight:600; white-space:nowrap;">Active Website:</label>
+                <select id="seo-website-selector" style="flex:1; background:rgba(0,0,0,0.4); border:1px solid rgba(56,189,248,0.3); color:#fff; padding:0.55rem 0.85rem; border-radius:8px; font-size:0.88rem; outline:none; cursor:pointer;">
+                  <option value="site_abhishek_portfolio">Abhishek Tiwari - Portfolio & Second Brain (https://www.abhishektiwari.online/)</option>
+                </select>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+                <button class="btn primary-btn" id="seo-sync-main-btn" style="background:linear-gradient(135deg, #6366f1, #4f46e5); border:none; padding:0.55rem 1rem; font-weight:600; font-size:0.84rem; display:flex; align-items:center; gap:0.4rem;">
+                  <span>⚡</span> Regenerate & Sync SEO
+                </button>
+                <button class="btn secondary-btn" id="seo-delete-website-btn" style="display:none; padding:0.55rem 0.85rem; font-size:0.84rem; background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.3); color:#fca5a5;">
+                  <span>🗑️</span> Remove
+                </button>
+              </div>
+            </div>
+
+            <!-- Active Website Details Banner -->
+            <div id="seo-active-website-card" style="background:rgba(0,0,0,0.3); border:1px solid var(--card-border); border-radius:10px; padding:1rem 1.25rem; margin-bottom:1.25rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.5rem;">
+                <div style="display:flex; align-items:center; gap:0.6rem;">
+                  <h4 id="active-site-display-name" style="margin:0; font-family:'Outfit',sans-serif; color:#fff; font-size:1.1rem;">Abhishek Tiwari - Portfolio & Second Brain</h4>
+                  <a id="active-site-display-url" href="https://www.abhishektiwari.online/" target="_blank" style="font-size:0.8rem; color:#38bdf8; text-decoration:none; display:flex; align-items:center; gap:0.25rem;">
+                    <span>↗ Visit Site</span>
+                  </a>
                 </div>
-                <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;">Paste this 1-line script tag inside the <code>&lt;head&gt;</code> of your website index.html, about.html, or contact.html. It automatically fetches live synced SEO metadata and updates all meta tags!</p>
-                <pre style="background:#090d16; color:#38bdf8; padding:0.75rem; border-radius:6px; font-size:0.82rem; overflow-x:auto; white-space:pre-wrap;" id="receiver-code-text"><code>&lt;script src="https://career-digest.vercel.app/seo-sync.js"&gt;&lt;/script&gt;</code></pre>
+                <span id="active-site-owner-badge" style="font-size:0.72rem; background:rgba(99,102,241,0.2); color:#a5b4fc; padding:0.2rem 0.6rem; border-radius:12px; border:1px solid rgba(99,102,241,0.3);">
+                  Owner: abhishektiwari1540@gmail.com
+                </span>
+              </div>
+              <p id="active-site-display-desc" style="font-size:0.84rem; color:var(--text-light); margin:0 0 0.6rem 0;">
+                Official Portfolio of Abhishek Tiwari - Senior Backend Developer (Node.js, TypeScript, Express) & AI LLM Integration Specialist.
+              </p>
+              <div id="active-site-display-keywords" style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+                <span class="keyword-tag">⚡ Abhishek Tiwari developer</span>
+                <span class="keyword-tag">⚡ Node.js Backend Developer Jaipur</span>
+              </div>
+            </div>
+
+            <!-- Dynamic Universal Script Embed Snippet -->
+            <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(56,189,248,0.25); border-radius:12px; padding:1.25rem; margin-bottom:1.25rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.5rem;">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                  <span style="font-size:1.2rem;">📦</span>
+                  <strong style="color:var(--accent-cyan); font-size:0.92rem;">Universal Dynamic SEO Embed Script for <code id="embed-site-label" style="color:#a5b4fc;">https://www.abhishektiwari.online/</code></strong>
+                </div>
+                <button class="btn secondary-btn" id="copy-receiver-code-btn" style="padding:0.35rem 0.8rem; font-size:0.8rem; background:rgba(6,182,212,0.15); border-color:rgba(6,182,212,0.35); color:#67e8f9; font-weight:600;">
+                  📋 Copy Embed Script
+                </button>
+              </div>
+              <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.6rem; line-height:1.5;">
+                Paste this single script tag into the <code>&lt;head&gt;</code> of your website HTML (e.g. <code>index.html</code>). It automatically fetches your real-time SEO metadata and injects Meta Titles, Descriptions, Keywords, OpenGraph cards, Twitter Cards, Canonical URLs, and Schema.org JSON-LD structured schemas on all pages!
+              </p>
+              <pre style="background:#090d16; color:#38bdf8; padding:0.85rem 1rem; border-radius:8px; font-size:0.84rem; overflow-x:auto; white-space:pre-wrap; border:1px solid rgba(255,255,255,0.06); font-family:monospace;" id="receiver-code-text"><code>&lt;script src="https://career-digest.vercel.app/seo-sync.js" data-site-id="site_abhishek_portfolio" async&gt;&lt;/script&gt;</code></pre>
+            </div>
+
+            <!-- Real-Time Generated Pages Breakdown Grid -->
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                <h4 style="margin:0; font-family:'Outfit',sans-serif; color:#fff; font-size:1rem; display:flex; align-items:center; gap:0.4rem;">
+                  <span>📑</span> Live Auto-Generated Page SEO Tags
+                </h4>
+                <span id="active-site-pages-count" style="font-size:0.75rem; color:var(--text-muted);">3 routes configured</span>
+              </div>
+              <div id="seo-sync-pages-breakdown" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(290px, 1fr)); gap:1rem;">
+                <p class="placeholder-text">Loading website page SEO metadata...</p>
               </div>
             </div>
           </div>
@@ -1046,6 +1240,8 @@ export function DailyChampionBlog() {
         <button class="btn primary-btn" id="complete-read-btn">✅ Complete & Save Reading to Database</button>
       </div>
     </div>
+  </div>
+
   <!-- AUTHENTICATION & CLONE ACTIVATION MODAL -->
   <div id="auth-modal" class="modal-overlay" style="display:none;">
     <div class="modal-card" style="max-width:520px;">
@@ -1186,6 +1382,53 @@ export function DailyChampionBlog() {
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD WEBSITE MODAL -->
+  <div id="add-website-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="max-width:520px;">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <span style="font-size:1.4rem;">🌐</span>
+          <div>
+            <h3 style="margin:0; font-family:'Outfit',sans-serif; color:#fff; font-size:1.15rem;">Register New Website</h3>
+            <span style="font-size:0.75rem; color:#38bdf8;">Multi-Website SEO Engine &amp; Dynamic Embed</span>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="close-add-website-modal-btn">✕</button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem;">
+        <div style="background:rgba(99,102,241,0.08); border-left:3px solid #6366f1; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#c7d2fe; margin-bottom:1.25rem;">
+          ⚡ Register any domain or web app. Career-Digest will auto-generate SEO metadata for Home, About, and Contact pages, and provide a unique 1-line script tag.
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem; font-weight:500;">Website / Project Name *</label>
+          <input type="text" id="modal-website-name" placeholder="e.g. NextGen Cloud Platform" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.9rem;" />
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem; font-weight:500;">Website URL / Domain *</label>
+          <input type="url" id="modal-website-url" placeholder="https://myplatform.com" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.9rem;" />
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem; font-weight:500;">Target SEO Keywords (Comma separated)</label>
+          <input type="text" id="modal-website-keywords" placeholder="e.g. cloud platform, ai developer, high concurrency nodejs" style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.9rem;" />
+        </div>
+
+        <div style="margin-bottom:1.25rem;">
+          <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem; font-weight:500;">Site Description / Brand Summary</label>
+          <textarea id="modal-website-desc" rows="3" placeholder="Brief description of your platform or portfolio..." style="width:100%; background:rgba(15,23,42,0.9); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.65rem 0.85rem; border-radius:8px; font-size:0.88rem; resize:vertical; font-family:inherit;"></textarea>
+        </div>
+
+        <div id="modal-add-website-error" style="display:none; color:#f87171; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+        <button class="btn primary-btn" id="modal-add-website-submit" style="width:100%; padding:0.75rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.95rem;">
+          🚀 Save Website &amp; Generate Embed Script
+        </button>
       </div>
     </div>
   </div>

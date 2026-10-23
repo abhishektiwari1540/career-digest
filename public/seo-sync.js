@@ -1,14 +1,25 @@
 /**
- * Auto-Updating SEO Synchronization Client Script for https://www.abhishektiwari.online/
- * Automatically fetches synchronized SEO metadata from https://career-digest.vercel.app/api/seo/sync
- * and updates document title, meta description, keywords, OpenGraph, Canonical & JSON-LD structured data.
+ * Dynamic Universal SEO Synchronization Client Script
+ * Embed this single script into ANY website to dynamically synchronize and inject
+ * Meta Titles, Meta Descriptions, Keywords, OpenGraph, Canonical & Schema.org JSON-LD structured data.
+ *
+ * Example Usage:
+ * <script src="https://career-digest.vercel.app/seo-sync.js" data-site-id="YOUR_SITE_ID" async></script>
  */
 (function () {
-  const API_ENDPOINT = "https://career-digest.vercel.app/api/seo/sync";
+  const currentScript = document.currentScript || 
+    document.querySelector('script[data-site-id]') || 
+    document.querySelector('script[src*="seo-sync.js"]');
+
+  const siteId = currentScript ? (currentScript.getAttribute("data-site-id") || "") : "";
+  const customApiUrl = currentScript ? (currentScript.getAttribute("data-api-url") || "") : "";
+  const baseApi = (customApiUrl || "https://career-digest.vercel.app").replace(/\/$/, "");
+
+  const API_ENDPOINT = siteId ? `${baseApi}/api/seo/embed/${siteId}` : `${baseApi}/api/seo/sync`;
 
   async function applySeoSync() {
     try {
-      const response = await fetch(API_ENDPOINT);
+      const response = await fetch(API_ENDPOINT, { mode: "cors" });
       if (!response.ok) return;
       const data = await response.json();
       if (!data.success || !data.pages) return;
@@ -20,10 +31,15 @@
       if (currentPath === "/about" || currentPath.includes("about")) {
         targetRoute = "/about";
       } else if (currentHash === "#contact" || currentPath === "/contact" || currentPath.includes("contact")) {
-        targetRoute = "/#contact";
+        targetRoute = "/contact";
+        if (!data.pages[targetRoute] && data.pages["/#contact"]) {
+          targetRoute = "/#contact";
+        }
+      } else if (data.pages[currentPath]) {
+        targetRoute = currentPath;
       }
 
-      const seo = data.pages[targetRoute] || data.pages["/"];
+      const seo = data.pages[targetRoute] || data.pages["/"] || Object.values(data.pages)[0];
       if (!seo) return;
 
       // 1. Update Title
@@ -51,6 +67,7 @@
       setOrUpdateMeta("name", "twitter:card", "summary_large_image");
       setOrUpdateMeta("name", "twitter:title", seo.og_title || seo.meta_title);
       setOrUpdateMeta("name", "twitter:description", seo.og_description || seo.meta_description);
+      if (seo.og_image) setOrUpdateMeta("name", "twitter:image", seo.og_image);
 
       // 6. Update Canonical URL
       if (seo.canonical_url) {
@@ -65,19 +82,19 @@
 
       // 7. Inject Structured Data (Schema.org JSON-LD)
       if (seo.structured_jsonld) {
-        let jsonLdEl = document.getElementById("seo-sync-jsonld");
+        let jsonLdEl = document.getElementById("career-digest-jsonld");
         if (!jsonLdEl) {
           jsonLdEl = document.createElement("script");
-          jsonLdEl.id = "seo-sync-jsonld";
+          jsonLdEl.id = "career-digest-jsonld";
           jsonLdEl.type = "application/ld+json";
           document.head.appendChild(jsonLdEl);
         }
         jsonLdEl.textContent = JSON.stringify(seo.structured_jsonld);
       }
 
-      console.log(`[SEO Sync] Applied updated SEO metadata for route "${targetRoute}" on https://www.abhishektiwari.online/`);
+      console.log(`[Career-Digest SEO Sync] Injected optimized SEO metadata for route "${targetRoute}" (Site ID: ${siteId || "default"})`);
     } catch (err) {
-      console.warn("[SEO Sync] Failed to fetch or apply SEO metadata:", err);
+      console.warn("[Career-Digest SEO Sync] Notice:", err);
     }
   }
 
