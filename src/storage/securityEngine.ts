@@ -667,24 +667,31 @@ export async function revokeInstance(instanceIdOrKey: string, reason: string, ad
  */
 export async function logGlobalSearch(data: {
   instanceId?: string;
-  userEmail: string;
-  searchQuery: string;
+  instance_id?: string;
+  userEmail?: string;
+  user_email?: string;
+  searchQuery?: string;
+  search_query?: string;
   searchType?: string;
+  search_type?: string;
   categoryFilter?: string;
+  category_filter?: string;
   resultsCount?: number;
+  results_count?: number;
   topMatchTitle?: string;
+  top_match_title?: string;
   city?: string;
   country?: string;
 }) {
   const log: GlobalSearchLog = {
     id: `srch_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
-    instance_id: data.instanceId,
-    user_email: data.userEmail || "anonymous_cloner",
-    search_type: data.searchType || "open_source_vector",
-    search_query: data.searchQuery,
-    category_filter: data.categoryFilter || "all",
-    results_count: data.resultsCount || 0,
-    top_match_title: data.topMatchTitle || "",
+    instance_id: data.instanceId || data.instance_id,
+    user_email: (data.userEmail || data.user_email || "anonymous_cloner").trim().toLowerCase(),
+    search_type: data.searchType || data.search_type || "open_source_vector",
+    search_query: data.searchQuery || data.search_query || "",
+    category_filter: data.categoryFilter || data.category_filter || "all",
+    results_count: data.resultsCount ?? data.results_count ?? 0,
+    top_match_title: data.topMatchTitle || data.top_match_title || "",
     city: data.city || "Unknown",
     country: data.country || "Global",
     created_at: new Date().toISOString(),
@@ -712,28 +719,36 @@ export async function logGlobalSearch(data: {
  */
 export async function logGlobalChat(data: {
   instanceId?: string;
-  userEmail: string;
-  sessionId: string;
+  instance_id?: string;
+  userEmail?: string;
+  user_email?: string;
+  sessionId?: string;
+  session_id?: string;
   presetMode?: string;
-  promptText: string;
+  preset_mode?: string;
+  promptText?: string;
+  prompt_text?: string;
   assistantResponse?: string;
+  assistant_response?: string;
   truthScore?: number;
+  truth_score?: number;
   city?: string;
   country?: string;
   ipAddress?: string;
+  ip_address?: string;
 }) {
   const log: GlobalChatLog = {
     id: `chat_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
-    instance_id: data.instanceId,
-    user_email: data.userEmail || "anonymous_cloner",
-    session_id: data.sessionId,
-    preset_mode: data.presetMode || "deep_planner",
-    prompt_text: data.promptText,
-    assistant_response: (data.assistantResponse || "").slice(0, 1000),
-    truth_score: data.truthScore || 95,
+    instance_id: data.instanceId || data.instance_id,
+    user_email: (data.userEmail || data.user_email || "anonymous_cloner").trim().toLowerCase(),
+    session_id: data.sessionId || data.session_id || "default_session",
+    preset_mode: data.presetMode || data.preset_mode || "deep_planner",
+    prompt_text: data.promptText || data.prompt_text || "",
+    assistant_response: (data.assistantResponse || data.assistant_response || "").slice(0, 1000),
+    truth_score: data.truthScore ?? data.truth_score ?? 95,
     city: data.city || "Unknown",
     country: data.country || "Global",
-    ip_address: data.ipAddress,
+    ip_address: data.ipAddress || data.ip_address,
     created_at: new Date().toISOString(),
   };
 
@@ -785,10 +800,26 @@ export async function getAdminTelemetryDashboard(adminEmail: string) {
     if (!reqRes.error && reqRes.data) requests = reqRes.data;
   } catch {}
 
-  if (instances.length === 0) instances = Array.from(memoryInstances.values());
-  if (chatLogs.length === 0) chatLogs = memoryChatLogs.slice(0, 50);
-  if (searchLogs.length === 0) searchLogs = memorySearchLogs.slice(0, 50);
-  if (requests.length === 0) requests = Array.from(memoryAccessRequests.values());
+  // Merge Supabase logs and in-memory fallback logs deduplicated by id
+  const combinedInstances = [...instances, ...Array.from(memoryInstances.values())];
+  const instMap = new Map<string, RegisteredInstance>();
+  combinedInstances.forEach((i) => { if (!instMap.has(i.id)) instMap.set(i.id, i); });
+  instances = Array.from(instMap.values());
+
+  const combinedChats = [...chatLogs, ...memoryChatLogs];
+  const chatMap = new Map<string, GlobalChatLog>();
+  combinedChats.forEach((c) => { if (!chatMap.has(c.id)) chatMap.set(c.id, c); });
+  chatLogs = Array.from(chatMap.values()).slice(0, 50);
+
+  const combinedSearches = [...searchLogs, ...memorySearchLogs];
+  const searchMap = new Map<string, GlobalSearchLog>();
+  combinedSearches.forEach((s) => { if (!searchMap.has(s.id)) searchMap.set(s.id, s); });
+  searchLogs = Array.from(searchMap.values()).slice(0, 50);
+
+  const combinedRequests = [...requests, ...Array.from(memoryAccessRequests.values())];
+  const reqMap = new Map<string, AccessRequest>();
+  combinedRequests.forEach((r) => { if (!reqMap.has(r.id)) reqMap.set(r.id, r); });
+  requests = Array.from(reqMap.values());
 
   const pendingRequests = requests.filter((r) => r.status === "pending");
   const activeNodesCount = instances.filter((i) => !i.is_revoked).length;
