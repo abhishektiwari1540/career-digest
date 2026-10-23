@@ -15,13 +15,26 @@
 
   <div class="app-container">
     <!-- Header Section -->
-    <header class="main-header">
+    <header class="main-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
       <div class="brand">
         <div class="logo-icon">🧠</div>
         <div>
           <h1>AI Second Brain</h1>
           <p class="subtitle">Personal Knowledge Engine, Grounded SEO & Self-Updating Growth Hub</p>
         </div>
+      </div>
+      <div class="header-auth-controls" id="header-auth-controls" style="display:flex; align-items:center; gap:0.75rem;">
+        <div id="auth-user-pill" style="display:none; align-items:center; gap:0.5rem; background:rgba(255,255,255,0.06); padding:0.4rem 0.85rem; border-radius:20px; border:1px solid rgba(255,255,255,0.1); font-size:0.82rem;">
+          <span id="auth-user-icon">👑</span>
+          <span id="auth-user-name" style="color:#fff; font-weight:600;">Abhishek Tiwari</span>
+          <span id="auth-role-badge" class="os-metric-badge" style="background:rgba(99,102,241,0.25); color:#a5b4fc; padding:0.15rem 0.45rem; font-size:0.7rem; border-radius:12px;">projectadmin</span>
+        </div>
+        <button class="btn secondary-btn" id="open-auth-modal-btn" style="padding:0.45rem 0.9rem; font-size:0.82rem; display:flex; align-items:center; gap:0.4rem; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.4); color:#a5b4fc;">
+          <span>🔐</span> Sign In / Activate
+        </button>
+        <button class="btn secondary-btn" id="auth-logout-btn" style="display:none; padding:0.45rem 0.9rem; font-size:0.82rem; background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.3); color:#fca5a5;">
+          <span>🚪</span> Logout
+        </button>
       </div>
     </header>
 
@@ -79,6 +92,9 @@
       </button>
       <button class="tab-btn" data-tab="tab-opensource">
         <span class="icon">🐙</span> Open Source AI
+      </button>
+      <button class="tab-btn" data-tab="tab-admin" id="admin-tab-btn" style="display:none; background:linear-gradient(135deg, rgba(239,68,68,0.2), rgba(245,158,11,0.2)); border:1px solid rgba(239,68,68,0.4); color:#fca5a5; font-weight:700;">
+        <span class="icon">🛡️</span> Control Center
       </button>
     </nav>
 
@@ -830,6 +846,121 @@ export function DailyChampionBlog() {
         </div>
       </section>
 
+      <!-- TAB 8: MASTER CONTROL CENTER & OMNISCIENT TELEMETRY (PROJECTADMIN ONLY) -->
+      <section id="tab-admin" class="tab-content">
+        <div class="opensource-hero-card" style="background:linear-gradient(135deg, rgba(30,27,75,0.7), rgba(15,23,42,0.85)); border-color:rgba(239,68,68,0.3);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+            <div>
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                <span style="font-size:1.6rem;">🛡️</span>
+                <h2 style="font-family:'Outfit',sans-serif; color:#fff; font-size:1.45rem; margin:0;">
+                  Master Security &amp; Omniscient Control Center
+                </h2>
+                <span class="os-metric-badge" style="background:rgba(239,68,68,0.2); color:#fca5a5; font-weight:700;">Owner Supremacy</span>
+              </div>
+              <p style="color:var(--text-muted); font-size:0.88rem; max-width:680px; line-height:1.5;">
+                Central telemetry and license control hub for <strong>Abhishek Tiwari</strong>. Inspect every active clone, approve new machine activation requests, observe global search queries and AI prompts, and exercise 1-click remote kill switches.
+              </p>
+            </div>
+            <button class="btn secondary-btn" id="refresh-admin-telemetry-btn" style="padding:0.6rem 1.1rem; font-weight:700; display:flex; align-items:center; gap:0.4rem; background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.4); color:#fca5a5;">
+              <span>🔄</span> Refresh Telemetry
+            </button>
+          </div>
+
+          <!-- Admin Metrics Bar -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:1rem; margin-top:1.5rem;">
+            <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1rem;">
+              <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Total Clones</div>
+              <div style="font-size:1.8rem; font-family:'Outfit',sans-serif; font-weight:800; color:#fff;" id="admin-stat-instances">0</div>
+              <div style="font-size:0.72rem; color:#38bdf8;">Registered Instances</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1rem;">
+              <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Active Nodes</div>
+              <div style="font-size:1.8rem; font-family:'Outfit',sans-serif; font-weight:800; color:#34d399;" id="admin-stat-active">0</div>
+              <div style="font-size:0.72rem; color:#34d399;">Live &amp; Connected</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1rem;">
+              <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Pending Requests</div>
+              <div style="font-size:1.8rem; font-family:'Outfit',sans-serif; font-weight:800; color:#fbbf24;" id="admin-stat-pending">0</div>
+              <div style="font-size:0.72rem; color:#fbbf24;">Waiting Approval</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1rem;">
+              <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Global Searches</div>
+              <div style="font-size:1.8rem; font-family:'Outfit',sans-serif; font-weight:800; color:#a5b4fc;" id="admin-stat-searches">0</div>
+              <div style="font-size:0.72rem; color:#a5b4fc;">Tracked In Real-Time</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:1rem;">
+              <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Global AI Chats</div>
+              <div style="font-size:1.8rem; font-family:'Outfit',sans-serif; font-weight:800; color:#c084fc;" id="admin-stat-chats">0</div>
+              <div style="font-size:0.72rem; color:#c084fc;">Copilot Transcripts</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telemetry Grids -->
+        <div style="margin-top:1.5rem; display:grid; grid-template-columns:1fr; gap:1.5rem;">
+          
+          <!-- Widget 1: Pending Access Requests Queue -->
+          <div style="background:rgba(15,23,42,0.65); border:1px solid rgba(245,158,11,0.3); border-radius:14px; padding:1.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <span style="font-size:1.2rem;">📥</span>
+                <h3 style="font-family:'Outfit',sans-serif; color:#fff; font-size:1.05rem; margin:0;">
+                  Pending Clone Activation Requests (Hand-to-Hand Verification Queue)
+                </h3>
+              </div>
+              <span class="os-metric-badge" id="admin-pending-badge" style="background:rgba(245,158,11,0.2); color:#fbbf24; font-weight:700;">0 Pending</span>
+            </div>
+            <div id="admin-requests-container" style="display:flex; flex-direction:column; gap:0.75rem;">
+              <p style="color:var(--text-muted); font-size:0.85rem; font-style:italic;">No pending activation requests. New cloner requests will appear here automatically.</p>
+            </div>
+          </div>
+
+          <!-- Widget 2: Registered Instances & 1-Click Remote Kill-Switch -->
+          <div style="background:rgba(15,23,42,0.65); border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:1.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <span style="font-size:1.2rem;">💻</span>
+                <h3 style="font-family:'Outfit',sans-serif; color:#fff; font-size:1.05rem; margin:0;">
+                  Active Cloned Instances &amp; Remote Kill-Switch
+                </h3>
+              </div>
+              <span style="font-size:0.75rem; color:var(--text-muted);">Revoking an instance immediately blocks the cloner from all AI &amp; search endpoints</span>
+            </div>
+            <div id="admin-instances-container" style="display:flex; flex-direction:column; gap:0.75rem;">
+              <p style="color:var(--text-muted); font-size:0.85rem; font-style:italic;">Loading registered node instances...</p>
+            </div>
+          </div>
+
+          <!-- Widget 3: Live Global Search Query Stream -->
+          <div style="background:rgba(15,23,42,0.65); border:1px solid rgba(99,102,241,0.25); border-radius:14px; padding:1.25rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem;">
+              <span style="font-size:1.2rem;">🔍</span>
+              <h3 style="font-family:'Outfit',sans-serif; color:#fff; font-size:1.05rem; margin:0;">
+                Live Omniscient Search Stream (All User Searches Globally)
+              </h3>
+            </div>
+            <div id="admin-searches-container" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:0.5rem;">
+              <p style="color:var(--text-muted); font-size:0.85rem; font-style:italic;">Loading live searches...</p>
+            </div>
+          </div>
+
+          <!-- Widget 4: Global AI Copilot Prompts & Transcripts -->
+          <div style="background:rgba(15,23,42,0.65); border:1px solid rgba(168,85,247,0.25); border-radius:14px; padding:1.25rem;">
+            <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem;">
+              <span style="font-size:1.2rem;">💬</span>
+              <h3 style="font-family:'Outfit',sans-serif; color:#fff; font-size:1.05rem; margin:0;">
+                Global AI Copilot Prompt &amp; Conversation Stream
+              </h3>
+            </div>
+            <div id="admin-chats-container" style="max-height:340px; overflow-y:auto; display:flex; flex-direction:column; gap:0.75rem;">
+              <p style="color:var(--text-muted); font-size:0.85rem; font-style:italic;">Loading chat stream...</p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
       <!-- OPEN-SOURCE ISSUE & AI SOLUTION MODAL -->
       <div id="os-solution-modal" class="modal-overlay" style="display:none;">
         <div class="modal-card" style="max-width:960px; max-height:90vh; overflow-y:auto;">
@@ -913,6 +1044,77 @@ export function DailyChampionBlog() {
       <div class="modal-foot">
         <button class="btn secondary-btn" id="cancel-read-btn">Discard Session</button>
         <button class="btn primary-btn" id="complete-read-btn">✅ Complete & Save Reading to Database</button>
+      </div>
+    </div>
+  <!-- AUTHENTICATION & CLONE ACTIVATION MODAL -->
+  <div id="auth-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="max-width:520px;">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <span style="font-size:1.4rem;">🔐</span>
+          <div>
+            <h3 id="auth-modal-title" style="margin:0; font-family:'Outfit',sans-serif; color:#fff; font-size:1.15rem;">Career-Digest Security Gateway</h3>
+            <span style="font-size:0.75rem; color:#38bdf8;">Root Owner &amp; Cloned Instance Handshake</span>
+          </div>
+        </div>
+        <button class="modal-close-btn" id="close-auth-modal-btn">✕</button>
+      </div>
+
+      <!-- Auth Tabs Switcher -->
+      <div style="display:flex; gap:0.5rem; padding:0.75rem 1.25rem; background:rgba(0,0,0,0.25); border-bottom:1px solid rgba(255,255,255,0.06);">
+        <button class="chip-btn active" id="auth-tab-login-btn" style="flex:1; text-align:center;">Sign In (Owner / User)</button>
+        <button class="chip-btn" id="auth-tab-activate-btn" style="flex:1; text-align:center;">Request Clone Access</button>
+      </div>
+
+      <div class="modal-body" style="padding:1.25rem;">
+        
+        <!-- Form 1: Sign In -->
+        <div id="auth-login-form-container">
+          <div style="background:rgba(99,102,241,0.08); border-left:3px solid #6366f1; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#c7d2fe; margin-bottom:1rem;">
+            👑 <strong>Project Owner Root Seed:</strong> <code>abhishektiwari1540@gmail.com</code> / <code>12345678</code>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Email Address</label>
+            <input type="email" id="login-input-email" placeholder="abhishektiwari1540@gmail.com" style="width:100%; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.88rem;" />
+          </div>
+
+          <div style="margin-bottom:1.25rem;">
+            <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Password</label>
+            <input type="password" id="login-input-password" placeholder="••••••••" style="width:100%; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.88rem;" />
+          </div>
+
+          <div id="login-error-msg" style="display:none; color:#f87171; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+          <button class="btn primary-btn" id="login-submit-btn" style="width:100%; padding:0.65rem; font-weight:700; background:linear-gradient(135deg, #6366f1, #4f46e5); font-size:0.92rem;">
+            Sign In &amp; Unlock Session
+          </button>
+        </div>
+
+        <!-- Form 2: Request Clone Activation -->
+        <div id="auth-activate-form-container" style="display:none;">
+          <div style="background:rgba(245,158,11,0.08); border-left:3px solid #f59e0b; padding:0.65rem 0.85rem; border-radius:0 6px 6px 0; font-size:0.8rem; color:#fde68a; margin-bottom:1rem;">
+            ⚡ <strong>Cloned Instance Handshake:</strong> Submitting sends a hand-to-hand verification request to <strong>Abhishek Tiwari</strong>. Upon approval, your random password &amp; license will be dispatched to your email.
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.35rem;">Your Email Address</label>
+            <input type="email" id="req-input-email" placeholder="developer@example.com" style="width:100%; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.6rem 0.85rem; border-radius:8px; font-size:0.88rem;" />
+          </div>
+
+          <!-- Telemetry Preview Box -->
+          <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:0.75rem; margin-bottom:1.25rem;">
+            <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; font-weight:700; margin-bottom:0.3rem;">📡 Auto-Captured Machine Telemetry</div>
+            <div style="font-size:0.78rem; color:#38bdf8;" id="detected-telemetry-text">📍 Fetching your IP &amp; Geolocation...</div>
+          </div>
+
+          <div id="req-status-msg" style="display:none; font-size:0.82rem; margin-bottom:0.75rem;"></div>
+
+          <button class="btn primary-btn" id="req-submit-btn" style="width:100%; padding:0.65rem; font-weight:700; background:linear-gradient(135deg, #10b981, #059669); font-size:0.92rem;">
+            🚀 Submit Request to Abhishek Tiwari
+          </button>
+        </div>
+
       </div>
     </div>
   </div>

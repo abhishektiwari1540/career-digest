@@ -38,11 +38,14 @@ document.addEventListener("DOMContentLoaded", () => {
         loadBlogsTab();
       } else if (targetTab === "tab-opensource") {
         loadOpenSourceTab();
+      } else if (targetTab === "tab-admin") {
+        loadAdminTelemetryTab();
       }
     });
   });
 
   // Initial Data Fetch
+  initAuthAndTelemetry();
   fetchStats();
   initSelfUpdatingEngineWatcher();
   initChatCopilot();
@@ -3065,9 +3068,534 @@ document.addEventListener("DOMContentLoaded", () => {
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  function escapeAttr(str) {
-    if (!str) return "";
-    return str.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // =========================================================================
+  // MASTER HYBRID SECURITY, RBAC & OMNISCIENT TELEMETRY CONTROLLERS
+  // =========================================================================
+  let currentAuthUser = null;
+  let currentAuthToken = localStorage.getItem("cd_auth_token") || "";
+  let clientTelemetryGeo = { city: "Jaipur", country: "India", ip: "127.0.0.1" };
+  let clientMachineId = localStorage.getItem("cd_machine_id") || "";
+
+  if (!clientMachineId) {
+    clientMachineId = "MAC_" + Math.random().toString(36).substring(2, 10).toUpperCase();
+    localStorage.setItem("cd_machine_id", clientMachineId);
+  }
+
+  async function initAuthAndTelemetry() {
+    // 1. Fetch Geolocation in background for handshake
+    try {
+      const geoController = new AbortController();
+      const geoTimeout = setTimeout(() => geoController.abort(), 2500);
+      const geoRes = await fetch("https://ipapi.co/json/", { signal: geoController.signal });
+      clearTimeout(geoTimeout);
+      const geoData = await geoRes.json();
+      if (geoData && geoData.ip) {
+        clientTelemetryGeo = {
+          city: geoData.city || "Unknown",
+          country: geoData.country_name || "Global",
+          ip: geoData.ip || "127.0.0.1",
+        };
+      }
+    } catch (e) {
+      // offline / fallback
+    }
+
+    const detectedElem = document.getElementById("detected-telemetry-text");
+    if (detectedElem) {
+      detectedElem.textContent = `📍 ${clientTelemetryGeo.city}, ${clientTelemetryGeo.country} · IP: ${clientTelemetryGeo.ip} · Node: ${clientMachineId}`;
+    }
+
+    // 2. Validate Existing Session
+    if (currentAuthToken) {
+      try {
+        const meRes = await fetch("/api/auth/me", {
+          headers: { Authorization: `Bearer ${currentAuthToken}` },
+        });
+        const meData = await meRes.json();
+        if (meData.success && meData.user) {
+          currentAuthUser = meData.user;
+          updateAuthUI();
+        } else {
+          // Token expired or revoked
+          logoutUser(false);
+        }
+      } catch (err) {
+        // network issue, try cached user
+        try {
+          const cached = JSON.parse(localStorage.getItem("cd_auth_user") || "null");
+          if (cached) {
+            currentAuthUser = cached;
+            updateAuthUI();
+          }
+        } catch {}
+      }
+    } else {
+      updateAuthUI();
+    }
+
+    // 3. Modal Controls
+    const authModal = document.getElementById("auth-modal");
+    const openAuthBtn = document.getElementById("open-auth-modal-btn");
+    const closeAuthBtn = document.getElementById("close-auth-modal-btn");
+    const logoutBtn = document.getElementById("auth-logout-btn");
+
+    if (openAuthBtn && authModal) {
+      openAuthBtn.onclick = () => {
+        authModal.style.display = "flex";
+      };
+    }
+
+    if (closeAuthBtn && authModal) {
+      closeAuthBtn.onclick = () => {
+        authModal.style.display = "none";
+      };
+    }
+
+    if (authModal) {
+      authModal.onclick = (e) => {
+        if (e.target === authModal) authModal.style.display = "none";
+      };
+    }
+
+    if (logoutBtn) {
+      logoutBtn.onclick = () => {
+        if (confirm("Sign out of Career-Digest?")) {
+          logoutUser(true);
+        }
+      };
+    }
+
+    // Switch between Sign In and Request Activation tabs
+    const tabLoginBtn = document.getElementById("auth-tab-login-btn");
+    const tabActivateBtn = document.getElementById("auth-tab-activate-btn");
+    const formLogin = document.getElementById("auth-login-form-container");
+    const formActivate = document.getElementById("auth-activate-form-container");
+
+    if (tabLoginBtn && tabActivateBtn && formLogin && formActivate) {
+      tabLoginBtn.onclick = () => {
+        tabLoginBtn.classList.add("active");
+        tabActivateBtn.classList.remove("active");
+        formLogin.style.display = "block";
+        formActivate.style.display = "none";
+      };
+
+      tabActivateBtn.onclick = () => {
+        tabActivateBtn.classList.add("active");
+        tabLoginBtn.classList.remove("active");
+        formLogin.style.display = "none";
+        formActivate.style.display = "block";
+      };
+    }
+
+    // 4. Sign In Form Handler
+    const loginSubmitBtn = document.getElementById("login-submit-btn");
+    const loginEmailInput = document.getElementById("login-input-email");
+    const loginPasswordInput = document.getElementById("login-input-password");
+    const loginErrorMsg = document.getElementById("login-error-msg");
+
+    if (loginSubmitBtn) {
+      loginSubmitBtn.onclick = async () => {
+        const email = loginEmailInput?.value?.trim();
+        const password = loginPasswordInput?.value?.trim();
+
+        if (!email || !password) {
+          if (loginErrorMsg) {
+            loginErrorMsg.textContent = "Please enter both email and password.";
+            loginErrorMsg.style.display = "block";
+          }
+          return;
+        }
+
+        loginSubmitBtn.disabled = true;
+        loginSubmitBtn.textContent = "Verifying...";
+        if (loginErrorMsg) loginErrorMsg.style.display = "none";
+
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+          const data = await res.json();
+
+          if (data.success && data.token) {
+            currentAuthToken = data.token;
+            currentAuthUser = data.user;
+            localStorage.setItem("cd_auth_token", data.token);
+            localStorage.setItem("cd_auth_user", JSON.stringify(data.user));
+
+            updateAuthUI();
+            if (authModal) authModal.style.display = "none";
+
+            alert(`🎉 Welcome ${data.user.full_name || data.user.email}! Role: ${data.user.role}`);
+
+            if (data.user.role === "projectadmin") {
+              const adminTab = document.getElementById("admin-tab-btn");
+              if (adminTab) adminTab.click();
+            }
+          } else {
+            throw new Error(data.error || "Login failed");
+          }
+        } catch (err) {
+          if (loginErrorMsg) {
+            loginErrorMsg.textContent = err.message;
+            loginErrorMsg.style.display = "block";
+          }
+        } finally {
+          loginSubmitBtn.disabled = false;
+          loginSubmitBtn.textContent = "Sign In & Unlock Session";
+        }
+      };
+    }
+
+    // 5. Clone Activation Request Handler
+    const reqSubmitBtn = document.getElementById("req-submit-btn");
+    const reqEmailInput = document.getElementById("req-input-email");
+    const reqStatusMsg = document.getElementById("req-status-msg");
+
+    if (reqSubmitBtn) {
+      reqSubmitBtn.onclick = async () => {
+        const email = reqEmailInput?.value?.trim();
+        if (!email || !email.includes("@")) {
+          if (reqStatusMsg) {
+            reqStatusMsg.style.color = "#f87171";
+            reqStatusMsg.textContent = "Please enter a valid email address.";
+            reqStatusMsg.style.display = "block";
+          }
+          return;
+        }
+
+        reqSubmitBtn.disabled = true;
+        reqSubmitBtn.textContent = "Transmitting Handshake Request...";
+        if (reqStatusMsg) reqStatusMsg.style.display = "none";
+
+        try {
+          const res = await fetch("/api/activation/request", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              requesterEmail: email,
+              machineId: clientMachineId,
+              city: clientTelemetryGeo.city,
+              country: clientTelemetryGeo.country,
+              deviceOs: navigator.platform || "browser",
+            }),
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            if (reqStatusMsg) {
+              reqStatusMsg.style.color = "#34d399";
+              reqStatusMsg.textContent = "✅ " + data.message;
+              reqStatusMsg.style.display = "block";
+            }
+            alert(`🎉 Request Transmitted!\n\n${data.message}`);
+          } else {
+            throw new Error(data.message || "Failed to submit request.");
+          }
+        } catch (err) {
+          if (reqStatusMsg) {
+            reqStatusMsg.style.color = "#f87171";
+            reqStatusMsg.textContent = "Error: " + err.message;
+            reqStatusMsg.style.display = "block";
+          }
+        } finally {
+          reqSubmitBtn.disabled = false;
+          reqSubmitBtn.textContent = "🚀 Submit Request to Abhishek Tiwari";
+        }
+      };
+    }
+
+    // Refresh telemetry button listener
+    const refreshTelemetryBtn = document.getElementById("refresh-admin-telemetry-btn");
+    if (refreshTelemetryBtn) {
+      refreshTelemetryBtn.onclick = () => loadAdminTelemetryTab();
+    }
+  }
+
+  function updateAuthUI() {
+    const userPill = document.getElementById("auth-user-pill");
+    const userName = document.getElementById("auth-user-name");
+    const userRole = document.getElementById("auth-role-badge");
+    const openAuthBtn = document.getElementById("open-auth-modal-btn");
+    const logoutBtn = document.getElementById("auth-logout-btn");
+    const adminTabBtn = document.getElementById("admin-tab-btn");
+
+    if (currentAuthUser && currentAuthToken) {
+      if (userPill) userPill.style.display = "flex";
+      if (userName) userName.textContent = currentAuthUser.full_name || currentAuthUser.email;
+      if (userRole) {
+        userRole.textContent = currentAuthUser.role;
+        userRole.style.background = currentAuthUser.role === "projectadmin" ? "rgba(239,68,68,0.25)" : "rgba(99,102,241,0.25)";
+        userRole.style.color = currentAuthUser.role === "projectadmin" ? "#fca5a5" : "#a5b4fc";
+      }
+
+      if (openAuthBtn) openAuthBtn.style.display = "none";
+      if (logoutBtn) logoutBtn.style.display = "flex";
+
+      // Show Admin Control Center only to projectadmin
+      if (adminTabBtn) {
+        adminTabBtn.style.display = currentAuthUser.role === "projectadmin" ? "flex" : "none";
+      }
+    } else {
+      if (userPill) userPill.style.display = "none";
+      if (openAuthBtn) openAuthBtn.style.display = "flex";
+      if (logoutBtn) logoutBtn.style.display = "none";
+      if (adminTabBtn) adminTabBtn.style.display = "none";
+    }
+  }
+
+  function logoutUser(alertUser = true) {
+    currentAuthUser = null;
+    currentAuthToken = "";
+    localStorage.removeItem("cd_auth_token");
+    localStorage.removeItem("cd_auth_user");
+    updateAuthUI();
+
+    // If currently on admin tab, switch to chat
+    if (activeTab === "tab-admin") {
+      const chatTab = document.querySelector('.tab-btn[data-tab="tab-chat"]');
+      if (chatTab) chatTab.click();
+    }
+
+    if (alertUser) {
+      alert("You have been signed out.");
+    }
+  }
+
+  async function loadAdminTelemetryTab() {
+    if (!currentAuthUser || currentAuthUser.role !== "projectadmin") {
+      const container = document.getElementById("admin-requests-container");
+      if (container) {
+        container.innerHTML = `<div class="error-banner" style="padding:1.5rem; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:10px; color:#f87171;">
+          <strong>Access Restricted:</strong> You must be signed in as projectadmin (Abhishek Tiwari) to access the Master Control Center.
+        </div>`;
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/telemetry", {
+        headers: { Authorization: `Bearer ${currentAuthToken}` },
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to load telemetry.");
+      }
+
+      // 1. Stats Bar
+      const statInstances = document.getElementById("admin-stat-instances");
+      const statActive = document.getElementById("admin-stat-active");
+      const statPending = document.getElementById("admin-stat-pending");
+      const statSearches = document.getElementById("admin-stat-searches");
+      const statChats = document.getElementById("admin-stat-chats");
+      const pendingBadge = document.getElementById("admin-pending-badge");
+
+      if (statInstances) statInstances.textContent = data.stats.totalInstances || 0;
+      if (statActive) statActive.textContent = data.stats.activeNodesCount || 0;
+      if (statPending) statPending.textContent = data.stats.pendingRequestsCount || 0;
+      if (statSearches) statSearches.textContent = data.stats.totalSearchQueries || 0;
+      if (statChats) statChats.textContent = data.stats.totalChatInteractions || 0;
+      if (pendingBadge) pendingBadge.textContent = `${data.stats.pendingRequestsCount || 0} Pending`;
+
+      // 2. Pending Requests List
+      const reqContainer = document.getElementById("admin-requests-container");
+      if (reqContainer) {
+        const pending = (data.pendingRequests || []).filter((r) => r.status === "pending");
+        if (pending.length === 0) {
+          reqContainer.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem; font-style:italic;">No pending activation requests. New cloner requests will appear here automatically.</p>`;
+        } else {
+          reqContainer.innerHTML = pending
+            .map((r) => `
+            <div style="background:rgba(0,0,0,0.3); border:1px solid rgba(245,158,11,0.3); border-radius:10px; padding:0.9rem 1.1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+              <div>
+                <div style="font-weight:700; color:#fff; font-size:0.95rem;">${escapeHtml(r.requester_email)}</div>
+                <div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.2rem;">
+                  📍 <strong>Location:</strong> ${escapeHtml(r.city || "Unknown")}, ${escapeHtml(r.country || "Global")} · 
+                  IP: <code>${escapeHtml(r.ip_address || "127.0.0.1")}</code> · 
+                  Node: <code>${escapeHtml(r.machine_id || "")}</code> · 
+                  Time: ${new Date(r.created_at).toLocaleTimeString()}
+                </div>
+              </div>
+              <div style="display:flex; gap:0.5rem;">
+                <button class="btn primary-btn approve-request-btn" data-req-id="${r.id}" style="padding:0.4rem 0.85rem; font-size:0.78rem; background:linear-gradient(135deg, #10b981, #059669); font-weight:700;">
+                  ✅ Approve &amp; Send Password
+                </button>
+                <button class="btn secondary-btn reject-request-btn" data-req-id="${r.id}" style="padding:0.4rem 0.85rem; font-size:0.78rem; color:#f87171; border-color:rgba(239,68,68,0.3);">
+                  ✕ Decline
+                </button>
+              </div>
+            </div>
+          `).join("");
+
+          // Attach listeners to Approve & Reject buttons
+          document.querySelectorAll(".approve-request-btn").forEach((btn) => {
+            btn.onclick = async () => {
+              const reqId = btn.dataset.reqId;
+              btn.disabled = true;
+              btn.textContent = "Approving & Emailing...";
+              try {
+                const aRes = await fetch("/api/admin/approve-request", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${currentAuthToken}`,
+                  },
+                  body: JSON.stringify({ requestId: reqId }),
+                });
+                const aData = await aRes.json();
+                if (aData.success) {
+                  alert(`🎉 ${aData.message}\n\nGenerated Password: ${aData.generatedPassword}\nLicense: ${aData.licenseKey}`);
+                  loadAdminTelemetryTab();
+                } else {
+                  alert(`Error: ${aData.error || aData.message}`);
+                }
+              } catch (e) {
+                alert(`Error: ${e.message}`);
+              }
+            };
+          });
+
+          document.querySelectorAll(".reject-request-btn").forEach((btn) => {
+            btn.onclick = async () => {
+              const reqId = btn.dataset.reqId;
+              if (confirm("Decline this activation request?")) {
+                await fetch("/api/admin/reject-request", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${currentAuthToken}`,
+                  },
+                  body: JSON.stringify({ requestId: reqId, reason: "Declined by owner" }),
+                });
+                loadAdminTelemetryTab();
+              }
+            };
+          });
+        }
+      }
+
+      // 3. Registered Instances & Kill-Switch
+      const instContainer = document.getElementById("admin-instances-container");
+      if (instContainer) {
+        const instances = data.instances || [];
+        if (instances.length === 0) {
+          instContainer.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem; font-style:italic;">No registered nodes yet.</p>`;
+        } else {
+          instContainer.innerHTML = instances
+            .map((inst) => {
+              const isRevoked = inst.is_revoked;
+              return `
+              <div style="background:rgba(0,0,0,0.25); border:1px solid ${isRevoked ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.06)"}; border-radius:10px; padding:0.85rem 1.1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+                <div>
+                  <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <span style="font-weight:700; color:#fff; font-size:0.92rem;">${escapeHtml(inst.owner_email)}</span>
+                    <span class="os-metric-badge" style="background:${isRevoked ? "rgba(239,68,68,0.2)" : "rgba(16,185,129,0.2)"}; color:${isRevoked ? "#f87171" : "#34d399"}; font-weight:700;">
+                      ${isRevoked ? "🔴 REVOKED" : "🟢 ACTIVE"}
+                    </span>
+                  </div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;">
+                    License: <code>${escapeHtml(inst.license_key)}</code> · 
+                    📍 ${escapeHtml(inst.city || "Unknown")}, ${escapeHtml(inst.country || "Global")} · 
+                    IP: <code>${escapeHtml(inst.last_ip || "")}</code> · 
+                    Last Heartbeat: ${new Date(inst.last_heartbeat).toLocaleTimeString()}
+                  </div>
+                </div>
+                <div>
+                  ${
+                    isRevoked
+                      ? `<span style="font-size:0.78rem; color:#f87171; font-weight:700;">Killed / Inactive</span>`
+                      : `<button class="btn secondary-btn revoke-instance-btn" data-inst-id="${inst.id || inst.license_key}" style="padding:0.4rem 0.85rem; font-size:0.78rem; background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.4); color:#fca5a5; font-weight:700;">
+                          🛑 Revoke License (Kill)
+                        </button>`
+                  }
+                </div>
+              </div>`;
+            })
+            .join("");
+
+          document.querySelectorAll(".revoke-instance-btn").forEach((btn) => {
+            btn.onclick = async () => {
+              const instId = btn.dataset.instId;
+              if (confirm(`Kill-Switch: Revoke license for node ${instId}? The cloner will immediately lose all access to AI and search endpoints.`)) {
+                await fetch("/api/admin/revoke-instance", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${currentAuthToken}`,
+                  },
+                  body: JSON.stringify({ instanceId: instId, reason: "Revoked by Abhishek Tiwari" }),
+                });
+                alert(`🛑 Node ${instId} has been revoked!`);
+                loadAdminTelemetryTab();
+              }
+            };
+          });
+        }
+      }
+
+      // 4. Live Searches Feed
+      const searchContainer = document.getElementById("admin-searches-container");
+      if (searchContainer) {
+        const searches = data.recentSearchLogs || [];
+        if (searches.length === 0) {
+          searchContainer.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem; font-style:italic;">No search logs recorded yet.</p>`;
+        } else {
+          searchContainer.innerHTML = searches
+            .map(
+              (s) => `
+            <div style="background:rgba(0,0,0,0.25); border-left:3px solid #6366f1; padding:0.5rem 0.8rem; border-radius:0 6px 6px 0; font-size:0.82rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+              <div>
+                <span style="color:#a5b4fc; font-weight:700;">"${escapeHtml(s.search_query)}"</span>
+                <span style="color:var(--text-muted); font-size:0.75rem; margin-left:0.5rem;">(${escapeHtml(s.search_type)}) · Results: ${s.results_count || 0}</span>
+              </div>
+              <div style="font-size:0.72rem; color:var(--text-muted);">
+                👤 ${escapeHtml(s.user_email)} · 📍 ${escapeHtml(s.city || "Local")}, ${escapeHtml(s.country || "Global")} · ${new Date(s.created_at).toLocaleTimeString()}
+              </div>
+            </div>
+          `
+            )
+            .join("");
+        }
+      }
+
+      // 5. Global Chat Stream
+      const chatContainer = document.getElementById("admin-chats-container");
+      if (chatContainer) {
+        const chats = data.recentChatLogs || [];
+        if (chats.length === 0) {
+          chatContainer.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem; font-style:italic;">No chat logs recorded yet.</p>`;
+        } else {
+          chatContainer.innerHTML = chats
+            .map(
+              (c) => `
+            <div style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:0.75rem 0.95rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem; font-size:0.75rem; color:var(--text-muted);">
+                <div>
+                  <strong style="color:#c084fc;">${escapeHtml(c.user_email)}</strong> · Mode: <code>${escapeHtml(c.preset_mode)}</code>
+                </div>
+                <div>📍 ${escapeHtml(c.city || "Local")}, ${escapeHtml(c.country || "Global")} · ${new Date(c.created_at).toLocaleTimeString()}</div>
+              </div>
+              <div style="font-size:0.86rem; color:#fff; font-weight:600; margin-bottom:0.3rem;">
+                💬 ${escapeHtml(c.prompt_text)}
+              </div>
+              ${
+                c.assistant_response
+                  ? `<div style="font-size:0.8rem; color:#94a3b8; line-height:1.4; max-height:80px; overflow-y:auto; background:rgba(0,0,0,0.3); padding:0.4rem 0.6rem; border-radius:6px;">
+                      ${escapeHtml(c.assistant_response.slice(0, 300))}...
+                     </div>`
+                  : ""
+              }
+            </div>
+          `
+            )
+            .join("");
+        }
+      }
+    } catch (err) {
+      alert(`Error loading admin telemetry: ${err.message}`);
+    }
   }
 });
 

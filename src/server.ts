@@ -95,15 +95,25 @@ import {
   executeChatCopilotFlow,
   AttachmentItem,
 } from "./llm/chatCopilotEngine.js";
-
-
-
-
+import {
+  initSecurityEngine,
+  loginUser,
+  verifyAuthToken,
+  submitAccessRequest,
+  getAccessRequests,
+  approveAccessRequest,
+  rejectAccessRequest,
+  revokeInstance,
+  logGlobalSearch,
+  logGlobalChat,
+  getAdminTelemetryDashboard,
+} from "./storage/securityEngine.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+initSecurityEngine();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 150 * 1024 * 1024 } });
 
 app.use(express.json());
@@ -131,6 +141,9 @@ app.use("/api", (req, res, next) => {
 
   // Allow all public dashboard & auto-post endpoints without requiring API_SECRET
   if (
+    urlPath.includes("auth") ||
+    urlPath.includes("activation") ||
+    urlPath.includes("admin") ||
     urlPath.includes("viral-posts") ||
     urlPath.includes("blogs") ||
     urlPath.includes("opensource") ||
@@ -1220,6 +1233,21 @@ app.post("/api/opensource/vector-search", async (req, res) => {
     const digest = await getLatestOpenSourceDigest();
     const matches = await searchOpenSourceWithVectorDb(digest, query || "", category || "all");
 
+    // Omniscient Central Telemetry: Log search query for Abhishek Tiwari's Admin Panel
+    const userEmail = (req.headers["x-user-email"] as string) || "community_cloner";
+    const userCity = (req.headers["x-user-city"] as string) || "Local";
+    const userCountry = (req.headers["x-user-country"] as string) || "Global";
+    logGlobalSearch({
+      userEmail,
+      searchQuery: query || "",
+      searchType: "open_source_vector",
+      categoryFilter: category || "all",
+      resultsCount: matches.length,
+      topMatchTitle: matches[0]?.repoFullName || "",
+      city: userCity,
+      country: userCountry,
+    });
+
     res.json({
       success: true,
       query: query || "",
@@ -1403,9 +1431,160 @@ app.post("/api/chat/message", async (req, res) => {
       truthScore: result.truthScore,
       groundedSources: result.groundedSources,
     });
+
+    // Omniscient Central Telemetry: Log chat prompt & AI response for Abhishek Tiwari's Admin Panel
+    const userEmail = (req.headers["x-user-email"] as string) || "community_cloner";
+    const userCity = (req.headers["x-user-city"] as string) || "Local";
+    const userCountry = (req.headers["x-user-country"] as string) || "Global";
+    const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "127.0.0.1";
+    logGlobalChat({
+      userEmail,
+      sessionId: currentSessionId,
+      presetMode: presetMode || "deep_planner",
+      promptText: prompt,
+      assistantResponse: result.assistantResponse,
+      truthScore: result.truthScore?.confidence,
+      city: userCity,
+      country: userCountry,
+      ipAddress: clientIp,
+    });
   } catch (err: any) {
     console.error("[server] /api/chat/message error:", err);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ====================================================================
+// MASTER HYBRID SECURITY, RBAC & ACTIVATION CONTROL ENDPOINTS
+// ====================================================================
+
+// POST /api/auth/login - Secure login with bcrypt verification and JWT generation
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const result = await loginUser(email, password);
+    if (!result.success) {
+      return res.status(401).json(result);
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/auth/me - Verify current active session and role
+app.get("/api/auth/me", (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ success: false, error: "Missing authorization token" });
+  }
+  const token = authHeader.split(" ")[1];
+  const verified = verifyAuthToken(token);
+  if (!verified.valid) {
+    return res.status(401).json({ success: false, error: "Invalid or expired session token" });
+  }
+  res.json({ success: true, user: verified.user });
+});
+
+// POST /api/activation/request - Cloned instance first-run access request with geolocation
+app.post("/api/activation/request", async (req, res) => {
+  try {
+    const { requesterEmail, machineId, country, city, deviceOs } = req.body;
+    const ipAddress = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "127.0.0.1";
+    const result = await submitAccessRequest({
+      requesterEmail,
+      machineId,
+      ipAddress,
+      country,
+      city,
+      deviceOs,
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/admin/telemetry - Live omniscient dashboard for projectadmin (Abhishek Tiwari)
+app.get("/api/admin/telemetry", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Token required" });
+    }
+    const token = authHeader.split(" ")[1];
+    const verified = verifyAuthToken(token);
+    if (!verified.valid) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+
+    const data = await getAdminTelemetryDashboard(verified.user.email);
+    res.json(data);
+  } catch (err: any) {
+    res.status(403).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/admin/approve-request - Approve cloner request, generate password & email via Resend
+app.post("/api/admin/approve-request", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    const token = authHeader.split(" ")[1];
+    const verified = verifyAuthToken(token);
+    if (!verified.valid) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+
+    const { requestId } = req.body;
+    const result = await approveAccessRequest(requestId, verified.user.email);
+    res.json(result);
+  } catch (err: any) {
+    res.status(403).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/admin/reject-request - Decline access request
+app.post("/api/admin/reject-request", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    const token = authHeader.split(" ")[1];
+    const verified = verifyAuthToken(token);
+    if (!verified.valid) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+
+    const { requestId, reason } = req.body;
+    const result = await rejectAccessRequest(requestId, reason, verified.user.email);
+    res.json(result);
+  } catch (err: any) {
+    res.status(403).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/admin/revoke-instance - 1-Click Remote Kill-Switch
+app.post("/api/admin/revoke-instance", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+    const token = authHeader.split(" ")[1];
+    const verified = verifyAuthToken(token);
+    if (!verified.valid) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+
+    const { instanceId, reason } = req.body;
+    const result = await revokeInstance(instanceId, reason, verified.user.email);
+    res.json(result);
+  } catch (err: any) {
+    res.status(403).json({ success: false, error: err.message });
   }
 });
 
