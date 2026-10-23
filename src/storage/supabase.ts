@@ -325,6 +325,46 @@ export async function buildPromptContext(): Promise<string> {
   }
 }
 
+export function cosineSimilarity(vecA: number[], vecB: number[]): number {
+  if (!vecA || !vecB || vecA.length === 0 || vecB.length === 0) return 0;
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  const len = Math.min(vecA.length, vecB.length);
+  for (let i = 0; i < len; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+export async function fetchMultimodalVectors(contentType?: string): Promise<Array<{
+  concept_key: string;
+  content_type: string;
+  embedding_vector: number[];
+  metadata: any;
+}>> {
+  try {
+    let query = supabase.from("multimodal_vectors").select("concept_key, content_type, embedding_vector, metadata");
+    if (contentType) {
+      query = query.eq("content_type", contentType);
+    }
+    const { data, error } = await query.order("created_at", { ascending: false }).limit(200);
+    if (error || !data) return [];
+    return data.map((d: any) => ({
+      concept_key: d.concept_key,
+      content_type: d.content_type,
+      embedding_vector: typeof d.embedding_vector === "string" ? JSON.parse(d.embedding_vector) : d.embedding_vector,
+      metadata: d.metadata || {},
+    }));
+  } catch (err: any) {
+    console.warn("[supabase] fetchMultimodalVectors warning:", err.message);
+    return [];
+  }
+}
+
 export async function saveMultimodalVector(conceptKey: string, contentType: string, vector: number[], metadata: any = {}) {
   try {
     const { error } = await supabase.from("multimodal_vectors").insert({

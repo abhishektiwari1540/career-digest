@@ -83,6 +83,11 @@ import {
   runWeeklyOpenSourceEngine,
 } from "./llm/openSourceEngine.js";
 import {
+  calculateDecisionScore,
+  searchOpenSourceWithVectorDb,
+  syncOpenSourceToVectorDb,
+} from "./llm/openSourceVectorEngine.js";
+import {
   createChatSession,
   getChatSessions,
   deleteChatSession,
@@ -1176,15 +1181,72 @@ app.post("/api/viral-posts/generate", async (req, res) => {
 // ----------------------------------------------------
 // Open Source AI Contribution Hub Endpoints
 // ----------------------------------------------------
-// GET /api/opensource - Retrieve Weekly 10 Analyzed Repositories & AI Solved Issues
+// GET /api/opensource - Retrieve Weekly 10 Analyzed Repositories & AI Solved Issues with Decision Scores
 app.get("/api/opensource", async (req, res) => {
   try {
-    const digest = await getLatestOpenSourceDigest();
+    const rawDigest = await getLatestOpenSourceDigest();
+
+    // Enrich issues with Fast Decision Matrix Scores
+    const enrichedRepos = (rawDigest.repositories || []).map((repo) => ({
+      ...repo,
+      issues: (repo.issues || []).map((issue) => {
+        const decision = calculateDecisionScore(repo, issue);
+        return {
+          ...issue,
+          fastDecisionScore: decision.fastDecisionScore,
+          decisionTag: decision.decisionTag,
+          decisionReasoning: decision.decisionReasoning,
+        };
+      }),
+    }));
+
     res.json({
       success: true,
-      digest,
+      digest: {
+        ...rawDigest,
+        repositories: enrichedRepos,
+        vectorSearchSupported: true,
+      },
     });
   } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/opensource/vector-search - Semantic Vector Search across Open-Source issues using Vector DB
+app.post("/api/opensource/vector-search", async (req, res) => {
+  try {
+    const { query, category } = req.body;
+    const digest = await getLatestOpenSourceDigest();
+    const matches = await searchOpenSourceWithVectorDb(digest, query || "", category || "all");
+
+    res.json({
+      success: true,
+      query: query || "",
+      category: category || "all",
+      totalMatches: matches.length,
+      matches,
+    });
+  } catch (err: any) {
+    console.error("[server] /api/opensource/vector-search error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/opensource/sync-vectors - Index and sync all 10 open-source repositories to Supabase multimodal_vectors
+app.post("/api/opensource/sync-vectors", async (req, res) => {
+  try {
+    const digest = await getLatestOpenSourceDigest();
+    const result = await syncOpenSourceToVectorDb(digest);
+
+    res.json({
+      success: true,
+      message: `Successfully vectorized and indexed ${result.syncedCount} open-source issues into Supabase Vector DB (multimodal_vectors)!`,
+      syncedCount: result.syncedCount,
+      totalVectors: result.totalVectors,
+    });
+  } catch (err: any) {
+    console.error("[server] /api/opensource/sync-vectors error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

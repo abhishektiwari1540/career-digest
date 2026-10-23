@@ -57,7 +57,10 @@
             "testingStrategy": "Run the existing Filament tables test suite and add a new test: create a model with a BelongsToMany relationship and a casted JSON attribute, load it in a Filament table, trigger the export action, and assert that the response is a CSV string containing the JSON‑encoded relationship data without throwing an exception. Example command: `php artisan test --filter=TableExportHandlesNestedArrays`.",
             "prTitle": "fix(tables): safely export columns containing arrays or JSON casts",
             "prDescriptionTemplate": "## Description\n\nThis PR resolves a crash that occurs when exporting table data containing nested arrays or JSON‑cast attributes. The exporter now detects complex types (arrays, Laravel Collections, and `JsonSerializable` objects) and converts them to a JSON string, preventing the \"Array to string conversion\" exception.\n\n## Changes Made\n\n- Updated `ArrayExporter` (and related export logic) to include a robust `formatValue` method.\n- Added comprehensive type handling for nulls, scalars, collections, arrays, and JSON‑serializable objects.\n- Included detailed docblocks and comments for maintainability.\n- Added a new unit test `TableExportHandlesNestedArrays` to verify correct behavior.\n\n## Testing\n\n- Ran the full Filament test suite (`php artisan test`) – all existing tests pass.\n- Executed the new export test confirming that CSV output includes JSON‑encoded relationship data and no exceptions are thrown.\n\n## Checklist\n\n- [x] Code follows the project's coding standards.\n- [x] Added/updated tests covering the new functionality.\n- [x] Documentation updated where necessary.\n\n---\n\nFeel free to reach out if any further adjustments are needed."
-          }
+          },
+          "fastDecisionScore": 95,
+          "decisionTag": "⚡ Rapid Solution",
+          "decisionReasoning": "High impact (94/100) with clear root-cause diagnosis. Excellent leverage for your portfolio."
         },
         {
           "id": 112485,
@@ -93,7 +96,10 @@
             "testingStrategy": "Run `php artisan test --filter=TextInputMaskTest` after adding a new test that renders a TextInput with ->mask('###-##') and ->debounce(200). Assert that the generated HTML contains `x-data=\"{ maskDebounce: 200 }\"` and that no JavaScript errors occur when typing rapidly. Additionally, open a browser, load a demo page with the component, type quickly and verify the input value updates correctly without noticeable lag.",
             "prTitle": "feat(forms): add debounce option to TextInput mask evaluation",
             "prDescriptionTemplate": "## Description\n\nThis PR introduces a **debounce** option for the `TextInput` component's mask evaluator. When a debounce duration is provided, mask calculations are throttled, preventing excessive Alpine.js morph operations during rapid typing.\n\n## Changes Made\n\n- Added `$debounce` property and `debounce()` method to `TextInput` PHP class.\n- Exposed `maskDebounce` in the Alpine configuration array.\n- Updated the JavaScript `text-input.js` component to wrap mask logic in a debounce wrapper when `maskDebounce` is set.\n- Included inline debounce fallback for environments without Alpine's built‑in debounce helper.\n- Added unit test `TextInputMaskTest` to verify markup and runtime behavior.\n\n## Why\n\n- Improves performance on large forms with masked inputs.\n- Gives developers fine‑grained control over input responsiveness.\n\n## Testing\n\n- Run the full test suite: `php artisan test`.\n- Manual verification: open the demo page, enable debounce, type quickly, and observe smooth input handling.\n\n## Related Issue\n\nCloses #12485"
-          }
+          },
+          "fastDecisionScore": 95,
+          "decisionTag": "⚡ Rapid Solution",
+          "decisionReasoning": "High impact (94/100) with clear root-cause diagnosis. Excellent leverage for your portfolio."
         }
       ]
     },
@@ -146,7 +152,10 @@
             "testingStrategy": "Run the existing backup command against a MySQL 8.4 instance with mysqlpump installed. Verify that the command completes without throwing an exception even though the STDERR contains the deprecation warning. Example: \n```bash\nphp artisan backup:run --only-db\n``` \nAdd a unit test that mocks Process to return a STDERR string containing a deprecation warning and asserts that MySqlDump::run() does not throw. Also add a test where STDERR contains a real error and assert that an exception is thrown.\n",
             "prTitle": "fix(mysql): ignore mysqlpump deprecation warnings and improve process buffering",
             "prDescriptionTemplate": "## Description\nThis PR resolves issue #1720 where MySQL 8.4's `mysqlpump` emits deprecation warnings on STDERR. The previous implementation treated any STDERR output as a failure, causing the `CleanStaleBackupsCommand` health check to break. Additionally, the Symfony Process was using the default timeout and buffer size, which could lead to dead‑locks on large dumps.\n\n## Changes Made\n- Added `stripDeprecationWarnings()` to filter out known harmless deprecation messages.\n- Disabled the default timeout and increased the buffer handling for the `Process` instance.\n- Updated error handling to only fail on genuine STDERR output.\n- Included comprehensive inline documentation.\n- Added/updated unit tests to cover the new behaviour.\n\n## Testing\n```bash\n# Run the backup against a MySQL 8.4 instance\nphp artisan backup:run --only-db\n# The command should complete successfully even with deprecation warnings.\n\n# Execute the test suite\ncomposer test\n```\nAll tests pass.\n\n## Checklist\n- [x] Code follows the project's coding standards.\n- [x] Added unit tests.\n- [x] Updated documentation where necessary.\n- [x] Verified no regression on MySQL versions <8.4.\n\n---\n*Thank you for reviewing!*"
-          }
+          },
+          "fastDecisionScore": 95,
+          "decisionTag": "⚡ Rapid Solution",
+          "decisionReasoning": "High impact (94/100) with clear root-cause diagnosis. Excellent leverage for your portfolio."
         }
       ]
     },
@@ -199,7 +208,10 @@
             "testingStrategy": "Run the existing Livewire test suite to ensure no regressions. Then add a Dusk test: 1) Start the multi‑step wizard, upload an image, proceed to next step. 2) Use Laravel's Carbon::setTestNow(now()->addMinutes(6)) to simulate a 6‑minute delay. 3) Navigate back to the preview step and assert that the <img> src attribute contains a valid URL (status 200). Command: php artisan dusk --filter=FileUploadPreviewExpiryTest",
             "prTitle": "fix(file-upload): regenerate temporary preview URLs on each render to prevent expiry in multi‑step wizards",
             "prDescriptionTemplate": "## Description\n\nThis PR addresses issue #8320 where preview URLs for uploaded files expired when users spent more than five minutes navigating a multi‑step registration wizard.\n\n### Fix\n- Added `generatePreviewUrl()` helper in `WithFileUploads` trait to create a fresh signed URL on every request.\n- Updated `FileUpload` component to use the new accessor, ensuring URLs are not cached.\n- Implemented a dehydrate hook to clear any stale `previewUrl` property on component re‑hydration.\n- Added comprehensive docblocks, type hints, and error handling.\n\n### Testing\n- Ran the full Livewire test suite (`phpunit`).\n- Added a Dusk test `FileUploadPreviewExpiryTest` that simulates a >5‑minute pause and verifies the preview remains accessible.\n\n### Impact\nRegenerating preview URLs eliminates a user‑experience bug in long‑running forms and improves reliability of the file‑upload component across all Livewire projects.\n\n---\n\n**Checklist**\n- [x] Code follows the project's coding standards.\n- [x] Added/updated tests.\n- [x] Updated documentation where applicable.\n- [x] Verified no new linting or static analysis warnings.\n\n---\n\nThank you for reviewing!"
-          }
+          },
+          "fastDecisionScore": 95,
+          "decisionTag": "⚡ Rapid Solution",
+          "decisionReasoning": "High impact (94/100) with clear root-cause diagnosis. Excellent leverage for your portfolio."
         }
       ]
     },
@@ -252,7 +264,10 @@
             "testingStrategy": "npm test -- --grep 'issue #13910'",
             "prTitle": "fix(nest): resolve feat(microservices): support custom backoff strate",
             "prDescriptionTemplate": "## Overview\nFixes #13910\n\n### Proposed Solution\n- Added defensive validation and graceful error fallback.\n- Prevented unhandled exceptions when processing complex relation inputs.\n- Included regression unit test to verify stability.\n\n### Verification\nPassed local test suite with 100% test coverage for modified lines."
-          }
+          },
+          "fastDecisionScore": 91,
+          "decisionTag": "💡 Great Learning Opportunity",
+          "decisionReasoning": "Deepens architecture in TypeScript & Node.js. Complete test strategy provided."
         }
       ]
     },
@@ -305,7 +320,10 @@
             "testingStrategy": "Run the existing Medusa pricing unit tests and add a new test case: create a cart with a multi‑currency region, add a line item with quantity 1, then bulk‑update the quantity to 10. Assert that cart.subtotal equals the sum of line.unit_price * quantity minus the correctly aggregated tax, with no 1‑cent discrepancy. Use `npm run test:unit -- pricing` to execute only pricing tests.",
             "prTitle": "fix(pricing): aggregate tax rounding for multi‑currency bulk quantity updates",
             "prDescriptionTemplate": "## Description\nThis PR resolves a rounding discrepancy that occurs when updating cart line item quantities in bulk for multi‑currency carts. The previous implementation rounded tax per line, leading to a 1‑cent mismatch in the cart subtotal.\n\n## Changes Made\n- Refactored `PricingService.calculateLineItemTax` to compute tax in aggregate before rounding.\n- Added proportional distribution of the rounded tax back to each line item to keep line‑level totals accurate.\n- Cleaned up temporary fields used during calculation.\n- Updated related type definitions/comments.\n\n## Testing\n- Existing pricing unit tests pass.\n- Added a new unit test `pricing/bulk-quantity-multi-currency.test.ts` that verifies no cent disparity after bulk quantity updates.\n\n## Impact\nFixes a subtle bug affecting merchants with multi‑currency setups, ensuring financial accuracy and improving trust in the platform.\n\n---\n*Signed-off-by: Abhishek Tiwari*"
-          }
+          },
+          "fastDecisionScore": 94,
+          "decisionTag": "⚡ Rapid Solution",
+          "decisionReasoning": "High impact (94/100) with clear root-cause diagnosis. Excellent leverage for your portfolio."
         }
       ]
     },
@@ -358,7 +376,10 @@
             "testingStrategy": "Run the existing test suite (`npm test`) to ensure no regressions. Then add an e2e test (e.g., using Cypress) that: 1) Opens the app, navigates to the WebSocket tab, 2) Triggers a disconnect (mock server close), 3) Switches to the REST tab and back to WebSocket repeatedly (at least 5 times), 4) Asserts that only a single setTimeout is pending (use `cy.window().its('setTimeout').should('have.been.calledOnce')` or inspect the internal `reconnectTimer` ref) and that only one WebSocket `open` event fires. Manual verification: open DevTools, monitor `window.setTimeout` count while switching tabs – it should not increase.\n",
             "prTitle": "fix(websocket): clear reconnect timer on tab change to prevent memory leak",
             "prDescriptionTemplate": "### Summary\nThis PR fixes a memory leak caused by lingering `setTimeout` reconnect timers when users switch away from the WebSocket tab. The fix ensures timers are cleared and sockets are closed on tab change and component unmount.\n\n### Changes Made\n- Added `reconnectTimer` ref and `clearReconnectTimer` helper in `useWebsocket.ts`.\n- Integrated cleanup in `onBeforeUnmount`.\n- Updated `WebsocketClient.vue` to watch route changes, clear timers, and close the socket when leaving the WebSocket tab.\n- Added defensive checks to avoid scheduling duplicate timers.\n\n### Testing\n- Ran the full test suite (`npm test`) with all existing tests passing.\n- Added an e2e Cypress test that switches tabs repeatedly and asserts only one active WebSocket connection and no pending timers.\n\n### Impact\nPrevents memory bloat and duplicate socket subscriptions, improving stability for users who frequently switch between REST and WebSocket tabs.\n\n---\n*Closes #4120*"
-          }
+          },
+          "fastDecisionScore": 94,
+          "decisionTag": "⚡ Rapid Solution",
+          "decisionReasoning": "High impact (94/100) with clear root-cause diagnosis. Excellent leverage for your portfolio."
         }
       ]
     },
@@ -411,7 +432,10 @@
             "testingStrategy": "Run the existing webhook test suite and add a new test: simulate a webhook that fails, enqueue it, process two retries, and assert that `payload.timestamp` after the second retry equals the original ISO string. Example using jest:\n```ts\nimport { enqueueWebhook } from '../../queues/webhookJob';\nimport { webhookQueue } from '../../queues/webhookJob';\n\ntest('timestamp persists across retries', async () => {\n  const original = new Date('2023-01-01T12:00:00Z');\n  await enqueueWebhook({event:'test.event', data:{}, timestamp: original});\n  // force first attempt to fail\n  jest.spyOn(global, 'deliverWebhook').mockRejectedValueOnce(new Error('fail'));\n  // process first job\n  await webhookQueue.run();\n  // process retry job\n  await webhookQueue.run();\n  const job = await webhookQueue.getNextJob();\n  const payload = job?.data.payload;\n  expect(payload.timestamp).toBe(original.toISOString());\n});\n```",
             "prTitle": "fix(webhooks): preserve original timestamp across exponential backoff retries",
             "prDescriptionTemplate": "## Summary\nThis PR fixes a regression where webhook retry jobs lost the original event timestamp after the second exponential backoff. The fix ensures the timestamp is serialized as an ISO string and never overwritten during retries.\n\n## Changes Made\n- Updated `webhookJob.ts` to serialize `timestamp` as ISO string and restore it as a `Date` only for processing.\n- Added `parseSerializedPayload` utility in `webhookPayload.ts` with validation.\n- Adjusted type definitions to reflect the new serialization format.\n- Included comprehensive comments explaining the reasoning.\n\n## Testing\n- Added a new Jest test to verify timestamp persistence across retries.\n- Ran the full test suite (`npm test`) with all existing tests passing.\n\n## Impact\n- Guarantees accurate event timing for downstream consumers.\n- Improves reliability of webhook delivery and audit trails.\n\n---\n*Closes #18450*"
-          }
+          },
+          "fastDecisionScore": 94,
+          "decisionTag": "⚡ Rapid Solution",
+          "decisionReasoning": "High impact (94/100) with clear root-cause diagnosis. Excellent leverage for your portfolio."
         }
       ]
     },
@@ -465,7 +489,10 @@
             "testingStrategy": "Run the existing PHPUnit test suite and add a new test case: send a POST to /v1/database/collections/{id}/documents with a payload of (MAX_BATCH_SIZE+1) documents and assert that the response status is 400 and the body contains the phrase \"exceeds maximum allowed\".",
             "prTitle": "fix(database): return clear 400 error when bulk document batch size exceeds limit",
             "prDescriptionTemplate": "## Description\n\nThis PR adds explicit validation for bulk document creation to ensure that requests exceeding the configured batch size return a **400 Bad Request** with a descriptive error message instead of a generic 500 error.\n\n## Changes Made\n- Added pre‑validation of the `documents` array length in `Document::createMultiple`.\n- Threw a dedicated `Exception` with a custom error code when the limit is exceeded.\n- Updated error handling to preserve the 400 response.\n- Included inline documentation and kept the max batch size constant in sync with the database configuration.\n- Added unit test verifying the new validation behavior.\n\n## Testing\n\n```\nphpunit --filter testCreateMultipleBatchLimitExceeded\n```\n\nAll existing tests pass:\n```\nphpunit\n``` \n\n## Checklist\n- [x] Code follows the project's coding standards.\n- [x] New tests added and all tests pass.\n- [x] Documentation updated where necessary.\n\n## References\n- Issue #8940\n- Appwrite documentation on bulk document creation limits.\n"
-          }
+          },
+          "fastDecisionScore": 95,
+          "decisionTag": "⚡ Rapid Solution",
+          "decisionReasoning": "High impact (94/100) with clear root-cause diagnosis. Excellent leverage for your portfolio."
         }
       ]
     },
@@ -517,7 +544,10 @@
             "testingStrategy": "Run `yarn test libs/langchain-google-genai` and add a new unit test in `libs/langchain-google-genai/src/chat_models.test.ts` that invokes `ChatGoogleGenerativeAI.withStructuredOutput()` or binds a JSON schema directly, asserting that the payload contains `responseSchema` and `responseMimeType` in `generationConfig`.",
             "prTitle": "feat(google-genai): add native support for JSON Schema responseSchema in generationConfig",
             "prDescriptionTemplate": "## Description\nThis PR adds native support for passing `responseSchema` directly into `generationConfig` for Google GenAI chat models in LangChain.js. This eliminates the need for manual prompt wrapping when enforcing structured JSON outputs.\n\n## Changes\n- Updated `mapGenerationConfig` utility to extract and forward `responseSchema` and enforce `responseMimeType: 'application/json'`.\n- Added unit tests verifying correct payload formatting for structured generation.\n\n## Related Issue\nCloses #7810"
-          }
+          },
+          "fastDecisionScore": 94,
+          "decisionTag": "⚡ Rapid Solution",
+          "decisionReasoning": "High impact (95/100) with clear root-cause diagnosis. Excellent leverage for your portfolio."
         }
       ]
     },
@@ -570,7 +600,10 @@
             "testingStrategy": "Run the existing test suite with `npm test` and add a new test in `packages/ra-ui-materialui/src/list/datagrid/__tests__/DataGridSelection.test.tsx` that:\n1. Renders a List with a DataGrid and a filter input.\n2. Selects a row, verifies `selectedIds` contains the row ID.\n3. Applies a filter that returns no results (mock the dataProvider to return an empty array).\n4. Asserts that `selectedIds` is now an empty array and that bulk action buttons are disabled.\nThe test can use `react-testing-library` and `jest` to simulate user events.\n",
             "prTitle": "fix(core): clear stale selectedIds when filter results in empty list",
             "prDescriptionTemplate": "## Description\nThis PR fixes a bug where row selections persisted after applying a filter that returned no matching records. The selection state is now synchronized with the current list of IDs, preventing accidental bulk actions on invisible rows.\n\n## Changes Made\n- Added a `useEffect` in `useListController` to filter out or clear `selectedIds` when the underlying `ids` array changes.\n- Added a safeguard `useEffect` in `DataGrid` to explicitly clear selection when the visible rows become empty.\n- Updated unit tests to cover the new behavior.\n\n## Testing\n- Run `npm test` to ensure all existing tests pass.\n- Added a new test `DataGridSelection.test.tsx` that verifies `selectedIds` is cleared after a filter that yields an empty result set.\n\n## Checklist\n- [x] Code follows the project's style guidelines.\n- [x] All tests pass.\n- [x] Documentation updated where necessary.\n\n---\nThank you for reviewing this fix!"
-          }
+          },
+          "fastDecisionScore": 94,
+          "decisionTag": "⚡ Rapid Solution",
+          "decisionReasoning": "High impact (94/100) with clear root-cause diagnosis. Excellent leverage for your portfolio."
         }
       ]
     }

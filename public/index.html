@@ -774,6 +774,9 @@ export function DailyChampionBlog() {
               <button class="btn primary-btn" id="refresh-opensource-btn" style="background:linear-gradient(135deg, #6366f1, #4f46e5); padding:0.6rem 1.25rem; font-weight:700; display:flex; align-items:center; gap:0.5rem; box-shadow:0 4px 15px rgba(99,102,241,0.4);">
                 <span>🔄</span> Scan 10 Repos with AI Now
               </button>
+              <button class="btn secondary-btn" id="sync-opensource-vectors-btn" style="padding:0.6rem 1.1rem; font-weight:600; display:flex; align-items:center; gap:0.4rem; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.4); color:#a5b4fc;" title="Index all issues into Supabase multimodal_vectors Table">
+                <span>🧠</span> Sync to Vector DB
+              </button>
               <button class="btn secondary-btn" id="copy-opensource-curl-btn" style="padding:0.6rem 1.1rem; font-weight:600; display:flex; align-items:center; gap:0.4rem;">
                 <span>📋</span> Copy OpenSource API cURL
               </button>
@@ -808,14 +811,15 @@ export function DailyChampionBlog() {
           <div style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
             <div style="display:flex; gap:0.5rem; flex-wrap:wrap;" id="os-category-filters">
               <button class="chip-btn active" data-filter="all">All Repos (10)</button>
+              <button class="chip-btn" data-filter="best_decision" style="background:linear-gradient(135deg, rgba(16,185,129,0.22), rgba(6,182,212,0.22)); border:1px solid rgba(16,185,129,0.5); color:#34d399; font-weight:700;">⭐ Best Decision Matches</button>
               <button class="chip-btn" data-filter="Laravel & PHP">Laravel &amp; PHP</button>
               <button class="chip-btn" data-filter="TypeScript & Node.js">TypeScript &amp; Node.js</button>
               <button class="chip-btn" data-filter="Full-Stack Platforms">Full-Stack Platforms</button>
               <button class="chip-btn" data-filter="AI & LLM Tools">AI &amp; LLM Tools</button>
               <button class="chip-btn" data-filter="React & Frontend">React &amp; Frontend</button>
             </div>
-            <div style="position:relative; min-width:280px; flex:1; max-width:400px;">
-              <input type="text" id="os-search-input" placeholder="🔍 Search repos, topics, or issues..." style="width:100%; background:rgba(15,23,42,0.7); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:0.55rem 1rem; border-radius:8px; font-size:0.85rem;" />
+            <div style="position:relative; min-width:280px; flex:1; max-width:440px;">
+              <input type="text" id="os-search-input" placeholder="⚡ Vector Semantic Search (e.g. export array bug, memory leak)..." style="width:100%; background:rgba(15,23,42,0.7); border:1px solid rgba(99,102,241,0.3); color:#fff; padding:0.55rem 1rem; border-radius:8px; font-size:0.85rem;" />
             </div>
           </div>
 

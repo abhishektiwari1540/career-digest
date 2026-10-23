@@ -65,7 +65,10 @@ export interface OpenSourceWeeklyDigest {
 function getCachePaths(): string[] {
   const p1 = path.join(process.cwd(), "src/storage/openSourceCache.json");
   const p2 = path.join(__dirname, "../storage/openSourceCache.json");
-  return Array.from(new Set([p1, p2]));
+  const p3 = path.join(process.cwd(), "public/openSourceData.json");
+  const p4 = path.join(__dirname, "../../public/openSourceData.json");
+  const p5 = path.join(process.cwd(), "dist/src/storage/openSourceCache.json");
+  return Array.from(new Set([p1, p2, p3, p4, p5]));
 }
 
 /**
