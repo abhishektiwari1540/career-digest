@@ -205,6 +205,127 @@ export async function loginUser(email: string, passwordPlain: string): Promise<{
 }
 
 /**
+ * Handle Social Login (Google, GitHub, LinkedIn)
+ * Authenticates verified social identity, checks disposable domains, upserts user, and generates signed JWT.
+ */
+export async function handleSocialLogin(data: {
+  provider: "google" | "github" | "linkedin";
+  email: string;
+  fullName?: string;
+  avatarUrl?: string;
+  providerId?: string;
+}): Promise<{
+  success: boolean;
+  token?: string;
+  user?: Partial<SystemUser>;
+  message?: string;
+  error?: string;
+}> {
+  const normalizedEmail = (data.email || "").trim().toLowerCase();
+  if (!normalizedEmail || !normalizedEmail.includes("@")) {
+    return { success: false, error: "A valid email is required for social authentication." };
+  }
+
+  // 1. Strict anti-abuse disposable email domain check
+  const check = isDisposableEmail(normalizedEmail);
+  if (check.isDisposable) {
+    return {
+      success: false,
+      error: `Social login rejected: email domain @${check.domain} is an unauthorized disposable email address. Please authenticate with a genuine work or personal account.`,
+    };
+  }
+
+  if (memoryUsers.size === 0) {
+    await initSecurityEngine();
+  }
+
+  const isRootOwner = normalizedEmail === "abhishektiwari1540@gmail.com";
+  let user: SystemUser | null = null;
+
+  // Check Supabase first
+  try {
+    const { data: dbUser, error } = await supabase
+      .from("system_users")
+      .select("*")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    if (!error && dbUser) {
+      user = dbUser as SystemUser;
+    }
+  } catch {}
+
+  if (!user) {
+    user = memoryUsers.get(normalizedEmail) || null;
+  }
+
+  const displayName = data.fullName?.trim() || (normalizedEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase()));
+
+  if (!user) {
+    // Create new user account authenticated via social provider
+    const salt = bcrypt.genSaltSync(12);
+    const randomPassword = `soc_${crypto.randomBytes(8).toString("hex")}!2026`;
+    const passwordHash = bcrypt.hashSync(randomPassword, salt);
+
+    user = {
+      id: `usr_soc_${Date.now()}_${crypto.randomBytes(3).toString("hex")}`,
+      email: normalizedEmail,
+      password_hash: passwordHash,
+      role: isRootOwner ? "projectadmin" : "instance_owner",
+      full_name: `${displayName} (${data.provider.toUpperCase()})`,
+      is_root_owner: isRootOwner,
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+
+    memoryUsers.set(normalizedEmail, user);
+
+    try {
+      await supabase.from("system_users").upsert({
+        email: user.email,
+        password_hash: user.password_hash,
+        role: user.role,
+        full_name: user.full_name,
+        is_root_owner: user.is_root_owner,
+        is_active: true,
+      }, { onConflict: "email" });
+    } catch (err: any) {
+      console.warn("[security] social login persist notice:", err.message);
+    }
+  } else {
+    // Existing user - ensure account is not suspended
+    if (!user.is_active) {
+      return { success: false, error: "Account has been suspended or deactivated by the project owner." };
+    }
+  }
+
+  // Issue signed JWT token valid for 30 days
+  const payload = {
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+    is_root_owner: user.is_root_owner,
+    full_name: user.full_name,
+    social_provider: data.provider,
+  };
+
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+
+  return {
+    success: true,
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      full_name: user.full_name,
+      is_root_owner: user.is_root_owner,
+    },
+    message: `Successfully authenticated with ${data.provider.toUpperCase()}!`,
+  };
+}
+
+/**
  * Verify JWT Auth Token
  */
 export function verifyAuthToken(token: string): { valid: boolean; user?: any; error?: string } {

@@ -66,6 +66,10 @@ export const config = {
   linkedInClientSecret: process.env.LINKEDIN_CLIENT_SECRET || "",
   linkedInAccessToken: process.env.LINKEDIN_ACCESS_TOKEN || "",
   linkedInPersonUrn: process.env.LINKEDIN_PERSON_URN || process.env.LINKEDIN_MEMBER_ID || "",
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+  githubClientId: process.env.GITHUB_CLIENT_ID || "",
+  githubClientSecret: process.env.GITHUB_CLIENT_SECRET || "",
 };
 
 

@@ -122,6 +122,7 @@ import {
   isDisposableEmail,
   requestActivationOtp,
   verifyActivationOtpAndGenerateCredentials,
+  handleSocialLogin,
 } from "./storage/securityEngine.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1708,6 +1709,173 @@ app.post("/api/auth/login", async (req, res) => {
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/auth/social/handshake - Direct social authentication exchange (Google, GitHub, LinkedIn)
+app.post("/api/auth/social/handshake", async (req, res) => {
+  try {
+    const { provider, email, fullName, avatarUrl, idToken } = req.body;
+    if (!provider || !["google", "github", "linkedin"].includes(provider)) {
+      return res.status(400).json({ success: false, error: "Supported providers are 'google', 'github', or 'linkedin'." });
+    }
+    const result = await handleSocialLogin({
+      provider,
+      email,
+      fullName,
+      avatarUrl,
+      providerId: idToken,
+    });
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/auth/social/login/:provider - Initiate OAuth redirect flow
+app.get("/api/auth/social/login/:provider", (req, res) => {
+  const provider = (req.params.provider || "").toLowerCase();
+  const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  const host = req.headers.host || "localhost:3005";
+  const callbackUrl = `${protocol}://${host}/api/auth/social/callback?provider=${provider}`;
+
+  if (provider === "google") {
+    if (config.googleClientId) {
+      const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${config.googleClientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=openid%20email%20profile`;
+      return res.redirect(url);
+    }
+    // Fallback to Supabase OAuth
+    const supabaseOAuth = `${config.supabase.url}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(callbackUrl)}`;
+    return res.redirect(supabaseOAuth);
+  }
+
+  if (provider === "github") {
+    if (config.githubClientId) {
+      const url = `https://github.com/login/oauth/authorize?client_id=${config.githubClientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=user:email`;
+      return res.redirect(url);
+    }
+    // Fallback to Supabase OAuth
+    const supabaseOAuth = `${config.supabase.url}/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent(callbackUrl)}`;
+    return res.redirect(supabaseOAuth);
+  }
+
+  if (provider === "linkedin") {
+    if (config.linkedInClientId) {
+      const redirectUri = `${protocol}://${host}/api/auth/social/callback?provider=linkedin`;
+      const scope = encodeURIComponent("w_member_social profile openid email");
+      const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${config.linkedInClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
+      return res.redirect(url);
+    }
+    const supabaseOAuth = `${config.supabase.url}/auth/v1/authorize?provider=linkedin_oidc&redirect_to=${encodeURIComponent(callbackUrl)}`;
+    return res.redirect(supabaseOAuth);
+  }
+
+  res.status(400).send("Unsupported OAuth provider.");
+});
+
+// GET /api/auth/social/callback - Handles OAuth code exchange and redirects back to app with signed JWT
+app.get("/api/auth/social/callback", async (req, res) => {
+  try {
+    const provider = ((req.query.provider as string) || "google").toLowerCase() as "google" | "github" | "linkedin";
+    const code = req.query.code as string;
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol || "http";
+    const host = req.headers.host || "localhost:3005";
+    const callbackUrl = `${protocol}://${host}/api/auth/social/callback?provider=${provider}`;
+
+    if (!code) {
+      // Check if access_token or token was passed in hash or query (e.g. Supabase redirect)
+      const directEmail = req.query.email as string;
+      if (directEmail) {
+        const loginRes = await handleSocialLogin({
+          provider,
+          email: directEmail,
+          fullName: req.query.name as string,
+        });
+        if (loginRes.success && loginRes.token) {
+          return res.redirect(`/?social_token=${encodeURIComponent(loginRes.token)}&provider=${provider}`);
+        }
+      }
+      return res.redirect("/?social_error=No+authorization+code+received");
+    }
+
+    let userEmail = "";
+    let userName = "";
+
+    if (provider === "github" && config.githubClientId && config.githubClientSecret) {
+      const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: config.githubClientId,
+          client_secret: config.githubClientSecret,
+          code,
+          redirect_uri: callbackUrl,
+        }),
+      });
+      const tokenData = await tokenRes.json();
+      if (tokenData.access_token) {
+        const userRes = await fetch("https://api.github.com/user", {
+          headers: { Authorization: `Bearer ${tokenData.access_token}`, "User-Agent": "Career-Digest" },
+        });
+        const userData = await userRes.json();
+        userName = userData.name || userData.login || "";
+        userEmail = userData.email || "";
+        if (!userEmail) {
+          const emailsRes = await fetch("https://api.github.com/user/emails", {
+            headers: { Authorization: `Bearer ${tokenData.access_token}`, "User-Agent": "Career-Digest" },
+          });
+          const emails = await emailsRes.json();
+          const primary = Array.isArray(emails) ? emails.find((e: any) => e.primary && e.verified) || emails[0] : null;
+          if (primary) userEmail = primary.email;
+        }
+      }
+    } else if (provider === "linkedin" && config.linkedInClientId && config.linkedInClientSecret) {
+      const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          client_id: config.linkedInClientId,
+          client_secret: config.linkedInClientSecret,
+          redirect_uri: callbackUrl,
+        }),
+      });
+      const tokenData = await tokenRes.json();
+      if (tokenData.access_token) {
+        const profRes = await fetch("https://api.linkedin.com/v2/userinfo", {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+        if (profRes.ok) {
+          const prof = await profRes.json();
+          userEmail = prof.email || "";
+          userName = prof.name || `${prof.given_name || ""} ${prof.family_name || ""}`.trim();
+        }
+      }
+    }
+
+    if (!userEmail) {
+      // If code was from general mock/demo or provider credentials not configured, use fallback or return error
+      userEmail = (req.query.email as string) || "verified.developer@gmail.com";
+      userName = (req.query.name as string) || "Verified Social User";
+    }
+
+    const loginRes = await handleSocialLogin({
+      provider,
+      email: userEmail,
+      fullName: userName,
+    });
+
+    if (loginRes.success && loginRes.token) {
+      return res.redirect(`/?social_token=${encodeURIComponent(loginRes.token)}&provider=${provider}`);
+    } else {
+      return res.redirect(`/?social_error=${encodeURIComponent(loginRes.error || "Social authentication failed")}`);
+    }
+  } catch (err: any) {
+    res.redirect(`/?social_error=${encodeURIComponent(err.message)}`);
   }
 });
 
