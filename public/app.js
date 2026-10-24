@@ -3441,35 +3441,32 @@ document.addEventListener("DOMContentLoaded", () => {
   // MASTER ZERO-TRUST SECURITY GATEKEEPER & AUTHENTICATED SESSION ENGINE
   // =========================================================================
   async function initAuthGatekeeper() {
-    // 1. Fetch Geolocation in background for handshake telemetry
-    try {
-      const geoController = new AbortController();
-      const geoTimeout = setTimeout(() => geoController.abort(), 2500);
-      const geoRes = await fetch("https://ipapi.co/json/", { signal: geoController.signal });
-      clearTimeout(geoTimeout);
-      const geoData = await geoRes.json();
-      if (geoData && geoData.ip) {
-        clientTelemetryGeo = {
-          city: geoData.city || "Unknown",
-          country: geoData.country_name || "Global",
-          ip: geoData.ip || "127.0.0.1",
-        };
-      }
-    } catch {}
-
-    const detectedElem = document.getElementById("detected-telemetry-text");
-    if (detectedElem) {
-      detectedElem.textContent = `📍 ${clientTelemetryGeo.city}, ${clientTelemetryGeo.country} · IP: ${clientTelemetryGeo.ip} · Node: ${clientMachineId}`;
-    }
-    const gateDetectedElem = document.getElementById("gate-detected-telemetry-text");
-    if (gateDetectedElem) {
-      gateDetectedElem.textContent = `📍 ${clientTelemetryGeo.city}, ${clientTelemetryGeo.country} · IP: ${clientTelemetryGeo.ip} · Node: ${clientMachineId}`;
-    }
-
-    // 2. Setup Event Listeners for Gatekeeper & In-Dashboard Modal
+    // 1. Setup Event Listeners IMMEDIATELY (Zero latency for UI & Logout interactivity)
     setupGatekeeperEventListeners();
     setupInDashboardAuthModal();
     setupSocialAuthListeners();
+
+    // 2. Fetch Geolocation non-blocking in background for handshake telemetry
+    fetch("https://ipapi.co/json/")
+      .then((res) => res.json())
+      .then((geoData) => {
+        if (geoData && geoData.ip) {
+          clientTelemetryGeo = {
+            city: geoData.city || "Unknown",
+            country: geoData.country_name || "Global",
+            ip: geoData.ip || "127.0.0.1",
+          };
+          const detectedElem = document.getElementById("detected-telemetry-text");
+          if (detectedElem) {
+            detectedElem.textContent = `📍 ${clientTelemetryGeo.city}, ${clientTelemetryGeo.country} · IP: ${clientTelemetryGeo.ip} · Node: ${clientMachineId}`;
+          }
+          const gateDetectedElem = document.getElementById("gate-detected-telemetry-text");
+          if (gateDetectedElem) {
+            gateDetectedElem.textContent = `📍 ${clientTelemetryGeo.city}, ${clientTelemetryGeo.country} · IP: ${clientTelemetryGeo.ip} · Node: ${clientMachineId}`;
+          }
+        }
+      })
+      .catch(() => {});
 
     // Check for social OAuth redirect token in URL (?social_token=... or #social_token=...)
     try {
@@ -3534,6 +3531,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (dashboard) dashboard.style.display = "none";
     if (gatekeeper) gatekeeper.style.display = "flex";
+
+    // Close any open modal overlays
+    document.querySelectorAll(".modal-overlay").forEach((modal) => {
+      modal.style.display = "none";
+    });
 
     updateAuthUI();
   }
@@ -4115,6 +4117,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (logoutConfirmModal) {
         logoutConfirmModal.style.display = "flex";
+      } else {
+        if (confirm("Sign out of Career-Digest?")) {
+          logoutUser(false);
+        }
       }
     }
 
@@ -4124,23 +4130,38 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    window.openLogoutModal = openLogoutModal;
+    window.closeLogoutModal = closeLogoutModal;
+
     if (logoutBtn) {
-      logoutBtn.onclick = () => {
+      logoutBtn.onclick = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
         openLogoutModal();
       };
     }
 
-    if (closeLogoutModalBtn) closeLogoutModalBtn.onclick = closeLogoutModal;
-    if (cancelLogoutModalBtn) cancelLogoutModalBtn.onclick = closeLogoutModal;
+    if (closeLogoutModalBtn) {
+      closeLogoutModalBtn.onclick = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        closeLogoutModal();
+      };
+    }
+    if (cancelLogoutModalBtn) {
+      cancelLogoutModalBtn.onclick = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        closeLogoutModal();
+      };
+    }
     if (logoutConfirmModal) {
       logoutConfirmModal.onclick = (e) => {
         if (e.target === logoutConfirmModal) closeLogoutModal();
       };
     }
     if (confirmLogoutModalBtn) {
-      confirmLogoutModalBtn.onclick = () => {
+      confirmLogoutModalBtn.onclick = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
         closeLogoutModal();
-        logoutUser(true);
+        logoutUser(false);
       };
     }
 
@@ -4648,7 +4669,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function logoutUser(alertUser = true) {
+  function logoutUser(alertUser = false) {
     lockDownUnauthenticatedGatekeeper();
 
     // Reset metrics on UI

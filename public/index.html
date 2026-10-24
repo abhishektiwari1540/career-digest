@@ -235,8 +235,8 @@
         <button class="btn secondary-btn" id="open-auth-modal-btn" style="padding:0.45rem 0.9rem; font-size:0.82rem; display:flex; align-items:center; gap:0.4rem; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.4); color:#a5b4fc;">
           <span>🔐</span> Sign In / Activate
         </button>
-        <button class="btn secondary-btn" id="auth-logout-btn" style="display:none; padding:0.45rem 0.9rem; font-size:0.82rem; background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.3); color:#fca5a5;">
-          <span>🚪</span> Logout
+        <button class="btn secondary-btn" id="auth-logout-btn" onclick="window.openLogoutModal &amp;&amp; window.openLogoutModal()" style="display:none; padding:0.45rem 0.9rem; font-size:0.82rem; background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.3); color:#fca5a5; cursor:pointer;">
+          <span style="pointer-events:none;">🚪</span> Logout
         </button>
       </div>
     </header>
@@ -1561,6 +1561,8 @@ export function DailyChampionBlog() {
         </button>
       </div>
     </div>
+  </div>
+
   <!-- Specialized Logout Confirmation Modal -->
   <div id="logout-confirm-modal" class="modal-overlay" style="display:none;">
     <div class="modal-card" style="max-width: 480px; border-radius: 20px; border: 1px solid rgba(239,68,68,0.35); box-shadow: 0 30px 70px -15px rgba(0,0,0,0.85), 0 0 40px -5px rgba(239,68,68,0.25);">
@@ -1637,6 +1639,8 @@ export function DailyChampionBlog() {
         </button>
       </div>
     </div>
+  </div>
+
   <!-- Social Identity Verification Handshake Modal -->
   <div id="quick-social-modal" class="modal-overlay" style="display:none;">
     <div class="modal-card" style="max-width: 480px; border-radius: 20px; border: 1px solid rgba(99,102,241,0.35); box-shadow: 0 30px 70px -15px rgba(0,0,0,0.85);">
