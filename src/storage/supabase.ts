@@ -236,8 +236,9 @@ export async function fetchSecondBrainMemories(
   userEmail?: string,
   role?: string
 ): Promise<Array<{ category: string; conceptKey: string; memoryText: string }>> {
-  const isRoot = role === "projectadmin" || userEmail === "abhishektiwari1540@gmail.com";
+  const adminEmail = (config.adminEmail || "").toLowerCase();
   const normalizedEmail = (userEmail || "").trim().toLowerCase();
+  const isRoot = role === "projectadmin" || (Boolean(adminEmail) && normalizedEmail === adminEmail);
 
   try {
     let query = supabase
@@ -252,8 +253,8 @@ export async function fetchSecondBrainMemories(
         category: d.category,
         conceptKey: d.concept_key,
         memoryText: d.memory_text,
-        user_id: d.user_id || "usr_root_abhishektiwari",
-        user_email: d.user_email || "abhishektiwari1540@gmail.com",
+        user_id: d.user_id || "usr_root_admin",
+        user_email: d.user_email || adminEmail,
       }));
 
       // Cache into in-memory store
@@ -310,8 +311,10 @@ export async function saveSecondBrainMemory(memory: {
   userId?: string;
   userEmail?: string;
 }) {
-  const normalizedEmail = (memory.userEmail || "abhishektiwari1540@gmail.com").trim().toLowerCase();
-  const assignedUserId = memory.userId || (normalizedEmail === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : `usr_${Date.now()}`);
+  const adminEmail = (config.adminEmail || "").trim().toLowerCase();
+  const normalizedEmail = (memory.userEmail || adminEmail || "user@example.com").trim().toLowerCase();
+  const isRoot = Boolean(adminEmail && normalizedEmail === adminEmail);
+  const assignedUserId = memory.userId || (isRoot ? "usr_root_admin" : `usr_${Date.now()}`);
 
   const record: SecondBrainMemoryRecord = {
     category: memory.category,
@@ -462,7 +465,8 @@ export async function fetchMultimodalVectors(
     const { data, error } = await query.order("created_at", { ascending: false }).limit(200);
     if (error || !data) return [];
     
-    const isRoot = role === "projectadmin" || userEmail === "abhishektiwari1540@gmail.com";
+    const adminEmail = (config.adminEmail || "").trim().toLowerCase();
+    const isRoot = role === "projectadmin" || (Boolean(adminEmail) && userEmail?.toLowerCase() === adminEmail);
     const mapped = data.map((d: any) => ({
       concept_key: d.concept_key,
       content_type: d.content_type,
@@ -474,7 +478,6 @@ export async function fetchMultimodalVectors(
       return mapped;
     }
 
-    // Scoped filtering: new data matches user_id or user_email; old data belongs to root owner Abhishek
     return mapped.filter((item) => {
       const itemUserId = item.metadata?.user_id;
       const itemEmail = (item.metadata?.user_email || "").toLowerCase();
@@ -496,8 +499,10 @@ export async function saveMultimodalVector(
   userId?: string,
   userEmail?: string
 ) {
-  const normalizedEmail = (userEmail || "abhishektiwari1540@gmail.com").trim().toLowerCase();
-  const assignedUserId = userId || (normalizedEmail === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : `usr_${Date.now()}`);
+  const adminEmail = (config.adminEmail || "").trim().toLowerCase();
+  const normalizedEmail = (userEmail || adminEmail || "user@example.com").trim().toLowerCase();
+  const isRoot = Boolean(adminEmail && normalizedEmail === adminEmail);
+  const assignedUserId = userId || (isRoot ? "usr_root_admin" : `usr_${Date.now()}`);
 
   const enrichedMetadata = {
     ...metadata,
@@ -561,8 +566,10 @@ export async function recordUserReadingLog(log: {
   userId?: string;
   userEmail?: string;
 }): Promise<UserReadingLog> {
-  const normalizedEmail = (log.userEmail || "abhishektiwari1540@gmail.com").trim().toLowerCase();
-  const assignedUserId = log.userId || (normalizedEmail === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : `usr_${Date.now()}`);
+  const adminEmail = (config.adminEmail || "").trim().toLowerCase();
+  const normalizedEmail = (log.userEmail || adminEmail || "user@example.com").trim().toLowerCase();
+  const isRoot = Boolean(adminEmail && normalizedEmail === adminEmail);
+  const assignedUserId = log.userId || (isRoot ? "usr_root_admin" : `usr_${Date.now()}`);
 
   const entry: UserReadingLog = {
     id: `read_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -613,8 +620,9 @@ export async function fetchUserReadingLogs(
   userEmail?: string,
   role?: string
 ): Promise<UserReadingLog[]> {
-  const isRoot = role === "projectadmin" || userEmail === "abhishektiwari1540@gmail.com";
+  const adminEmail = (config.adminEmail || "").trim().toLowerCase();
   const normalizedEmail = (userEmail || "").trim().toLowerCase();
+  const isRoot = role === "projectadmin" || (Boolean(adminEmail) && normalizedEmail === adminEmail);
 
   try {
     let query = supabase
@@ -705,8 +713,8 @@ export async function saveSeoMetadataRecords(records: SeoPageMetadataRecord[]): 
       meta_keywords: r.meta_keywords,
       og_title: r.og_title || r.meta_title,
       og_description: r.og_description || r.meta_description,
-      og_image: r.og_image || "https://www.abhishektiwari.online/og-image.jpg",
-      canonical_url: r.canonical_url || `https://www.abhishektiwari.online${r.page_route}`,
+      og_image: r.og_image || "/og-image.jpg",
+      canonical_url: r.canonical_url || r.page_route,
       structured_jsonld: r.structured_jsonld || {},
       updated_at: updatedTime,
     }));

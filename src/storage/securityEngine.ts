@@ -5,7 +5,32 @@ import { Resend } from "resend";
 import { supabase } from "./supabase.js";
 import { config } from "../config.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "career_digest_master_secret_2026_abhishek";
+let _ephemeralSecret: string | null = null;
+export function getJwtSecret(): string {
+  if (config.jwtSecret && config.jwtSecret.trim() !== "") {
+    return config.jwtSecret.trim();
+  }
+  if (process.env.JWT_SECRET && process.env.JWT_SECRET.trim() !== "") {
+    return process.env.JWT_SECRET.trim();
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("[security] FATAL: JWT_SECRET must be configured in production environment!");
+  }
+  if (!_ephemeralSecret) {
+    _ephemeralSecret = crypto.randomBytes(32).toString("hex");
+  }
+  return _ephemeralSecret;
+}
+
+export function isProjectAdminEmail(email?: string): boolean {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  const configuredAdmin = (config.adminEmail || "").trim().toLowerCase();
+  if (configuredAdmin && normalized === configuredAdmin) return true;
+  const user = memoryUsers.get(normalized);
+  return user?.role === "projectadmin" || user?.is_root_owner === true;
+}
+
 const resendClient = config.resend.apiKey ? new Resend(config.resend.apiKey) : null;
 
 export interface SystemUser {
@@ -87,20 +112,29 @@ const memorySearchLogs: GlobalSearchLog[] = [];
 export const memoryResetCodes = new Map<string, { email: string; code: string; expiresAt: number }>();
 
 /**
- * Initialize Security Engine: Seed Root Admin (Abhishek Tiwari)
+ * Initialize Security Engine: Seed Root Admin from secure environment variables
  */
 export async function initSecurityEngine() {
-  const rootEmail = "abhishektiwari1540@gmail.com";
-  const defaultPassword = "12345678";
+  const rootEmail = (config.adminEmail || process.env.ADMIN_EMAIL || "").trim().toLowerCase();
+  if (!rootEmail) return;
+
+  const adminPassword = config.adminPassword || process.env.ADMIN_PASSWORD;
+  let effectivePassword = adminPassword;
+  if (!effectivePassword) {
+    // Generate secure random bootstrap password if none configured
+    effectivePassword = crypto.randomBytes(12).toString("base64").replace(/[+/=]/g, "a");
+    console.log(`[security] ⚠️ No ADMIN_PASSWORD configured. Auto-generated bootstrap admin password for ${rootEmail}: ${effectivePassword}`);
+  }
+
   const salt = bcrypt.genSaltSync(12);
-  const passwordHash = bcrypt.hashSync(defaultPassword, salt);
+  const passwordHash = bcrypt.hashSync(effectivePassword, salt);
 
   const rootUser: SystemUser = {
-    id: "usr_root_abhishektiwari",
+    id: `usr_root_${rootEmail.replace(/[^a-zA-Z0-9]/g, "_")}`,
     email: rootEmail,
     password_hash: passwordHash,
     role: "projectadmin",
-    full_name: "Abhishek Tiwari (Owner)",
+    full_name: `${config.candidateName} (Admin)`,
     is_root_owner: true,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -114,7 +148,7 @@ export async function initSecurityEngine() {
         email: rootEmail,
         password_hash: passwordHash,
         role: "projectadmin",
-        full_name: "Abhishek Tiwari",
+        full_name: rootUser.full_name,
         is_root_owner: true,
         is_active: true,
       },
@@ -124,7 +158,7 @@ export async function initSecurityEngine() {
       console.log(`[security] Root projectadmin (${rootEmail}) verified in Supabase.`);
     }
   } catch (err: any) {
-    console.warn("[security] system_users table not yet migrated, using in-memory auth store:", err.message);
+    console.warn("[security] system_users table note:", err.message);
   }
 }
 
@@ -189,7 +223,7 @@ export async function loginUser(email: string, passwordPlain: string): Promise<{
     full_name: user.full_name,
   };
 
-  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+  const token = jwt.sign(payload, getJwtSecret(), { expiresIn: "30d" });
 
   return {
     success: true,
@@ -239,7 +273,7 @@ export async function handleSocialLogin(data: {
     await initSecurityEngine();
   }
 
-  const isRootOwner = normalizedEmail === "abhishektiwari1540@gmail.com";
+  const isRootOwner = Boolean(config.adminEmail && normalizedEmail === config.adminEmail);
   let user: SystemUser | null = null;
 
   // Check Supabase first
@@ -309,7 +343,7 @@ export async function handleSocialLogin(data: {
     social_provider: data.provider,
   };
 
-  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+  const token = jwt.sign(payload, getJwtSecret(), { expiresIn: "30d" });
 
   return {
     success: true,
@@ -330,10 +364,13 @@ export async function handleSocialLogin(data: {
  */
 export function verifyAuthToken(token: string): { valid: boolean; user?: any; error?: string } {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, getJwtSecret()) as any;
+    const isRoot = decoded.role === "projectadmin" || (config.adminEmail && decoded.email?.toLowerCase() === config.adminEmail);
     const userObj = {
       ...decoded,
-      id: decoded.sub || decoded.id || (decoded.email === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : undefined),
+      id: decoded.sub || decoded.id || (isRoot ? "usr_root_admin" : undefined),
+      role: isRoot ? "projectadmin" : (decoded.role || "user"),
+      is_root_owner: Boolean(isRoot),
     };
     return { valid: true, user: userObj };
   } catch (err: any) {
@@ -394,7 +431,7 @@ export async function requestPasswordReset(email: string): Promise<{ success: bo
             </div>
             <p style="font-size:0.85rem; color:#94a3b8;">Enter this 6-digit code in the Career-Digest password reset window to set your new password.</p>
             <hr style="border:none; border-top:1px solid rgba(255,255,255,0.1); margin:1.5rem 0;" />
-            <p style="font-size:0.75rem; color:#64748b;">Project Owner: Abhishek Tiwari · Jaipur, India · abhishektiwari1540@gmail.com</p>
+            <p style="font-size:0.75rem; color:#64748b;">Career-Digest Security Engine · ${config.candidateName} · ${config.adminEmail}</p>
           </div>
         `,
       });
@@ -405,11 +442,14 @@ export async function requestPasswordReset(email: string): Promise<{ success: bo
   }
 
   const isLocalDev = !config.resend.apiKey || config.resend.apiKey.includes("placeholder");
+  if (isLocalDev) {
+    console.log(`[security:dev] Password reset verification code for ${normalizedEmail}: [${code}]`);
+  }
 
   return {
     success: true,
     message: `Verification code sent to ${normalizedEmail}! Please check your email inbox.`,
-    debugCode: isLocalDev ? code : undefined,
+    debugCode: undefined,
   };
 }
 
@@ -649,7 +689,7 @@ export async function requestActivationOtp(data: {
             </div>
             <p style="font-size:0.85rem; color:#94a3b8; line-height:1.5;">Enter this verification code on your screen to verify your email. Once verified, your auto-generated secure password and license key will be emailed to this address.</p>
             <hr style="border:none; border-top:1px solid rgba(255,255,255,0.1); margin:1.5rem 0;" />
-            <p style="font-size:0.75rem; color:#64748b;">Project Owner: Abhishek Tiwari · Jaipur, India · abhishektiwari1540@gmail.com</p>
+            <p style="font-size:0.75rem; color:#64748b;">Career-Digest Security Engine · ${config.candidateName} · ${config.adminEmail}</p>
           </div>
         `,
       });
@@ -660,11 +700,14 @@ export async function requestActivationOtp(data: {
   }
 
   const isLocalDev = !config.resend.apiKey || config.resend.apiKey.includes("placeholder");
+  if (isLocalDev) {
+    console.log(`[security:dev] Activation OTP code for ${normalizedEmail}: [${code}]`);
+  }
 
   return {
     success: true,
     message: `Verification code sent to ${normalizedEmail}! Please check your email inbox to verify.`,
-    debugCode: (isLocalDev || process.env.NODE_ENV === "test") ? code : undefined,
+    debugCode: undefined,
   };
 }
 
@@ -813,31 +856,33 @@ export async function verifyActivationOtpAndGenerateCredentials(
 
             <p style="font-size:0.85rem; color:#94a3b8; line-height:1.5;">You can now return to the login screen and sign in with this password. All your upcoming memories, websites, reading logs, and AI chat copilot sessions will be isolated to your account.</p>
             <hr style="border:none; border-top:1px solid rgba(255,255,255,0.1); margin:1.5rem 0;" />
-            <p style="font-size:0.75rem; color:#64748b;">Project Owner: Abhishek Tiwari · Jaipur, India · abhishektiwari1540@gmail.com</p>
+            <p style="font-size:0.75rem; color:#64748b;">Career-Digest Security Engine · ${config.candidateName} · ${config.adminEmail}</p>
           </div>
         `,
       });
       console.log(`[security] Credentials email dispatched via Resend to ${normalizedEmail}`);
 
-      // Also notify Abhishek Tiwari
-      await resendClient.emails.send({
-        from: config.resend.fromEmail || "no-reply@career-digest.online",
-        to: "abhishektiwari1540@gmail.com",
-        subject: `🔔 Verified Node Activation: ${normalizedEmail} (${stored.city || "Local"}, ${stored.country || "India"})`,
-        html: `
-          <div style="font-family:sans-serif; background:#0f172a; color:#fff; padding:1.5rem; border-radius:10px;">
-            <h3 style="color:#34d399; margin-top:0;">New Verified Instance Registered</h3>
-            <p>A new real user has verified their email via OTP and activated their node:</p>
-            <ul>
-              <li><strong>Email:</strong> ${normalizedEmail}</li>
-              <li><strong>Location:</strong> ${stored.city || "Unknown"}, ${stored.country || "Global"}</li>
-              <li><strong>IP:</strong> ${stored.ipAddress || "Unknown"}</li>
-              <li><strong>Machine ID:</strong> ${stored.machineId}</li>
-              <li><strong>License:</strong> ${licenseKey}</li>
-            </ul>
-          </div>
-        `,
-      }).catch(() => {});
+      // Also notify Admin if configured
+      if (config.adminEmail) {
+        await resendClient.emails.send({
+          from: config.resend.fromEmail || "no-reply@career-digest.online",
+          to: config.adminEmail,
+          subject: `🔔 Verified Node Activation: ${normalizedEmail} (${stored.city || "Local"}, ${stored.country || "India"})`,
+          html: `
+            <div style="font-family:sans-serif; background:#0f172a; color:#fff; padding:1.5rem; border-radius:10px;">
+              <h3 style="color:#34d399; margin-top:0;">New Verified Instance Registered</h3>
+              <p>A new real user has verified their email via OTP and activated their node:</p>
+              <ul>
+                <li><strong>Email:</strong> ${normalizedEmail}</li>
+                <li><strong>Location:</strong> ${stored.city || "Unknown"}, ${stored.country || "Global"}</li>
+                <li><strong>IP:</strong> ${stored.ipAddress || "Unknown"}</li>
+                <li><strong>Machine ID:</strong> ${stored.machineId}</li>
+                <li><strong>License:</strong> ${licenseKey}</li>
+              </ul>
+            </div>
+          `,
+        }).catch(() => {});
+      }
     } catch (mailErr: any) {
       console.warn("[security] Email dispatch notice:", mailErr.message);
     }
@@ -916,11 +961,8 @@ export async function submitAccessRequest(data: {
  * List Access Requests (Projectadmin Only)
  */
 export async function getAccessRequests(adminEmail: string): Promise<AccessRequest[]> {
-  if (adminEmail !== "abhishektiwari1540@gmail.com") {
-    const user = memoryUsers.get(adminEmail);
-    if (!user || user.role !== "projectadmin") {
-      throw new Error("Unauthorized: Projectadmin role required.");
-    }
+  if (!isProjectAdminEmail(adminEmail)) {
+    throw new Error("Unauthorized: Projectadmin role required.");
   }
 
   try {
@@ -949,11 +991,8 @@ export async function approveAccessRequest(
   requestId: string,
   adminEmail: string
 ): Promise<{ success: boolean; generatedPassword?: string; licenseKey?: string; message: string }> {
-  if (adminEmail !== "abhishektiwari1540@gmail.com") {
-    const user = memoryUsers.get(adminEmail);
-    if (!user || user.role !== "projectadmin") {
-      throw new Error("Unauthorized: Projectadmin role required.");
-    }
+  if (!isProjectAdminEmail(adminEmail)) {
+    throw new Error("Unauthorized: Projectadmin role required.");
   }
 
   let request = memoryAccessRequests.get(requestId);
@@ -1065,7 +1104,7 @@ export async function approveAccessRequest(
 
             <p style="font-size:0.85rem; color:#94a3b8;">You may now return to your local instance at <code>http://localhost:3005</code> and log in to unlock the full AI Copilot, Open-Source Diagnostic Hub, and Second Brain dashboard.</p>
             <hr style="border:none; border-top:1px solid rgba(255,255,255,0.1); margin:1.5rem 0;" />
-            <p style="font-size:0.75rem; color:#64748b;">Project Owner: Abhishek Tiwari · Jaipur, India · abhishektiwari1540@gmail.com</p>
+            <p style="font-size:0.75rem; color:#64748b;">Career-Digest Security Engine · ${config.candidateName} · ${config.adminEmail}</p>
           </div>
         `,
       });
@@ -1087,7 +1126,7 @@ export async function approveAccessRequest(
  * Reject Access Request
  */
 export async function rejectAccessRequest(requestId: string, reason: string, adminEmail: string) {
-  if (adminEmail !== "abhishektiwari1540@gmail.com") {
+  if (!isProjectAdminEmail(adminEmail)) {
     throw new Error("Unauthorized");
   }
 
@@ -1112,7 +1151,7 @@ export async function rejectAccessRequest(requestId: string, reason: string, adm
  * Revoke Node Instance (Remote Kill-Switch)
  */
 export async function revokeInstance(instanceIdOrKey: string, reason: string, adminEmail: string) {
-  if (adminEmail !== "abhishektiwari1540@gmail.com") {
+  if (!isProjectAdminEmail(adminEmail)) {
     throw new Error("Unauthorized");
   }
 
@@ -1243,14 +1282,11 @@ export async function logGlobalChat(data: {
 }
 
 /**
- * Get Comprehensive Admin Telemetry Dashboard (For Abhishek Tiwari)
+ * Get Comprehensive Admin Telemetry Dashboard
  */
 export async function getAdminTelemetryDashboard(adminEmail: string) {
-  if (adminEmail !== "abhishektiwari1540@gmail.com") {
-    const user = memoryUsers.get(adminEmail);
-    if (!user || user.role !== "projectadmin") {
-      throw new Error("Unauthorized: Projectadmin role required.");
-    }
+  if (!isProjectAdminEmail(adminEmail)) {
+    throw new Error("Unauthorized: Projectadmin role required.");
   }
 
   let instances: RegisteredInstance[] = [];

@@ -31,74 +31,73 @@ export interface UserWebsite {
 const memoryWebsites = new Map<string, UserWebsite>();
 
 /**
- * Initialize default website for Root Owner (Abhishek Tiwari)
+ * Initialize default website from environment configuration
  */
 export async function initDefaultWebsites() {
-  const rootEmail = "abhishektiwari1540@gmail.com";
-  const defaultSiteId = "site_abhishek_portfolio";
+  const rootEmail = (config.adminEmail || "admin@yourdomain.com").trim().toLowerCase();
+  const defaultSiteId = "site_default_portfolio";
+  const name = config.candidateName || "Developer";
 
   if (!memoryWebsites.has(defaultSiteId)) {
     const defaultSite: UserWebsite = {
       id: defaultSiteId,
-      user_id: "usr_root_abhishektiwari",
+      user_id: "usr_root_admin",
       owner_email: rootEmail,
-      site_name: "Abhishek Tiwari - Portfolio & Second Brain",
-      site_url: "https://www.abhishektiwari.online/",
-      site_description: "Official Portfolio of Abhishek Tiwari - Senior Backend Developer (Node.js, TypeScript, Express) & AI LLM Integration Specialist.",
+      site_name: `${name} - Portfolio & Second Brain`,
+      site_url: "https://yourdomain.com/",
+      site_description: `Official Portfolio of ${name} - Senior Full Stack Developer & AI LLM Integration Specialist.`,
       target_keywords: [
-        "Abhishek Tiwari developer",
-        "Node.js Backend Developer Jaipur",
+        `${name} developer`,
         "TypeScript AI Engineer",
         "Express.js Microservices",
-        "Gemini Vector Search"
+        "Vector Search Engine"
       ],
       pages_seo: {
         "/": {
           page_route: "/",
-          meta_title: "Abhishek Tiwari | Senior Backend Developer (Node.js, Express, TypeScript) & AI Engineer",
-          meta_description: "Official Portfolio of Abhishek Tiwari - Senior Backend Developer & AI LLM Integration Specialist building high-concurrency Node.js microservices and Gemini vector search engines.",
-          meta_keywords: "Abhishek Tiwari, Senior Backend Developer, Node.js, TypeScript, Express.js, AI Engineer, Gemini Vector Search",
-          og_title: "Abhishek Tiwari | Senior Backend Developer & AI LLM Specialist",
-          og_description: "Building high-throughput Node.js microservices, real-time WebSockets, and Gemini multimodal vector search systems.",
-          og_image: "https://www.abhishektiwari.online/og-image.jpg",
-          canonical_url: "https://www.abhishektiwari.online/",
+          meta_title: `${name} | Senior Backend Developer & AI Engineer`,
+          meta_description: `Portfolio of ${name} - Full Stack Developer & AI Specialist building microservices and vector search systems.`,
+          meta_keywords: `${name}, Backend Developer, Node.js, TypeScript, AI Engineer`,
+          og_title: `${name} | Developer Portfolio`,
+          og_description: "Building scalable microservices and AI vector search applications.",
+          og_image: "/og-image.jpg",
+          canonical_url: "https://yourdomain.com/",
           structured_jsonld: {
             "@context": "https://schema.org",
             "@type": "Person",
-            "name": "Abhishek Tiwari",
-            "url": "https://www.abhishektiwari.online/",
-            "jobTitle": "Senior Backend Developer & AI Engineer",
-            "address": { "@type": "PostalAddress", "addressLocality": "Jaipur", "addressCountry": "IN" }
+            "name": name,
+            "url": "https://yourdomain.com/",
+            "jobTitle": "Senior Full Stack & AI Engineer"
           }
         },
         "/about": {
           page_route: "/about",
-          meta_title: "About Abhishek Tiwari | Senior Backend Developer & Systems Architect",
-          meta_description: "Learn about Abhishek Tiwari's technical background, 3+ years engineering scalable backend systems with Node.js, Laravel, and LLM integrations.",
-          meta_keywords: "About Abhishek Tiwari, Backend Architect, Node.js Developer Experience",
-          og_title: "About Abhishek Tiwari | Backend Engineer & Systems Architect",
-          og_description: "Architectural philosophy, technical achievements, and production deployments.",
-          og_image: "https://www.abhishektiwari.online/og-image.jpg",
-          canonical_url: "https://www.abhishektiwari.online/about",
+          meta_title: `About ${name} | Systems Architect`,
+          meta_description: `Technical background and engineering architecture by ${name}.`,
+          meta_keywords: `About ${name}, Developer Experience`,
+          og_title: `About ${name} | Engineer`,
+          og_description: "Architectural philosophy and production deployments.",
+          og_image: "/og-image.jpg",
+          canonical_url: "https://yourdomain.com/about",
           structured_jsonld: {
             "@context": "https://schema.org",
             "@type": "AboutPage",
-            "name": "About Abhishek Tiwari"
+            "name": `About ${name}`
           }
         },
         "/#contact": {
           page_route: "/#contact",
-          meta_title: "Contact Abhishek Tiwari | Hire Senior Backend & AI Engineer",
-          meta_description: "Get in touch with Abhishek Tiwari for senior backend engineering roles, AI consulting, or high-throughput microservices architecture.",
-          meta_keywords: "Contact Abhishek Tiwari, Hire Node.js Developer, Jaipur Software Engineer",
-          og_title: "Contact Abhishek Tiwari | Available for Engineering Roles",
-          og_description: "Connect via email at abhishektiwari1540@gmail.com or LinkedIn.",
-          og_image: "https://www.abhishektiwari.online/og-image.jpg",
-          canonical_url: "https://www.abhishektiwari.online/#contact",
+          meta_title: `Contact ${name} | Inquiries & Roles`,
+          meta_description: `Get in touch with ${name} for software engineering inquiries.`,
+          meta_keywords: `Contact ${name}, Software Engineer`,
+          og_title: `Contact ${name}`,
+          og_description: `Connect via email at ${rootEmail}.`,
+          og_image: "/og-image.jpg",
+          canonical_url: "https://yourdomain.com/#contact",
           structured_jsonld: {
             "@context": "https://schema.org",
             "@type": "ContactPage",
-            "name": "Contact Abhishek Tiwari"
+            "name": `Contact ${name}`
           }
         }
       },
@@ -117,12 +116,14 @@ export async function getUserWebsites(userEmail: string, role?: string, userId?:
   await initDefaultWebsites();
 
   const normalizedEmail = (userEmail || "").trim().toLowerCase();
-  const targetUserId = userId || (normalizedEmail === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : undefined);
+  const adminEmail = (config.adminEmail || "").trim().toLowerCase();
+  const isRoot = role === "projectadmin" || (Boolean(adminEmail) && normalizedEmail === adminEmail);
+  const targetUserId = userId || (isRoot ? "usr_root_admin" : undefined);
   
   // Try fetching from Supabase
   try {
     let query = supabase.from("user_websites").select("*").order("created_at", { ascending: false });
-    if (role !== "projectadmin" && normalizedEmail !== "abhishektiwari1540@gmail.com") {
+    if (!isRoot) {
       if (targetUserId) {
         query = query.or(`owner_email.eq.${normalizedEmail},user_id.eq.${targetUserId}`);
       } else {
@@ -133,7 +134,7 @@ export async function getUserWebsites(userEmail: string, role?: string, userId?:
     if (!error && data && data.length > 0) {
       // Sync into memory cache
       data.forEach((row: any) => {
-        const uId = row.user_id || (row.owner_email === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : undefined);
+        const uId = row.user_id || (row.owner_email === adminEmail ? "usr_root_admin" : undefined);
         memoryWebsites.set(row.id, {
           id: row.id,
           user_id: uId,
@@ -151,7 +152,7 @@ export async function getUserWebsites(userEmail: string, role?: string, userId?:
   } catch {}
 
   const all = Array.from(memoryWebsites.values());
-  if (role === "projectadmin" || normalizedEmail === "abhishektiwari1540@gmail.com") {
+  if (isRoot) {
     return all.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
@@ -209,7 +210,9 @@ export async function addUserWebsite(
   await initDefaultWebsites();
 
   const normalizedEmail = (ownerEmail || "").trim().toLowerCase();
-  const assignedUserId = userId || (normalizedEmail === "abhishektiwari1540@gmail.com" ? "usr_root_abhishektiwari" : `usr_${Date.now()}`);
+  const adminEmail = (config.adminEmail || "").trim().toLowerCase();
+  const isRoot = Boolean(adminEmail && normalizedEmail === adminEmail);
+  const assignedUserId = userId || (isRoot ? "usr_root_admin" : `usr_${Date.now()}`);
   let cleanUrl = (data.siteUrl || "").trim();
   if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
     cleanUrl = "https://" + cleanUrl;

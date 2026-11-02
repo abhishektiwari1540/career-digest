@@ -28,6 +28,20 @@ export async function processLinkedInZipArchive(
   const zip = new AdmZip(buffer);
   const zipEntries = zip.getEntries();
 
+  // Safety Gate: Zip-Bomb & Resource Exhaustion Defense
+  if (zipEntries.length > 500) {
+    throw new Error(`Zip archive rejected: Contains ${zipEntries.length} entries (maximum allowed is 500).`);
+  }
+
+  let totalUncompressedSize = 0;
+  const MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024; // 50 MB safety ceiling
+  for (const entry of zipEntries) {
+    totalUncompressedSize += (entry.header ? entry.header.size : 0);
+    if (totalUncompressedSize > MAX_UNCOMPRESSED_BYTES) {
+      throw new Error(`Zip archive rejected: Uncompressed size exceeds 50MB security ceiling.`);
+    }
+  }
+
   let sharesCount = 0;
   let articlesCount = 0;
   let positionsCount = 0;

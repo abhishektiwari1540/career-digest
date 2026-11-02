@@ -167,30 +167,39 @@ export async function run() {
   console.log("[career-digest] done");
 }
 
+const isMain = process.argv[1] && (
+  process.argv[1].endsWith("/index.ts") ||
+  process.argv[1].endsWith("/index.js") ||
+  process.argv[1].endsWith("\\index.ts") ||
+  process.argv[1].endsWith("\\index.js")
+);
+
 const isDaemon =
   process.argv.includes("--daemon") ||
   process.argv.includes("--watch") ||
   process.env.DAEMON_MODE === "true";
 
-if (isDaemon) {
-  console.log(`[career-digest] Running in continuous daily daemon mode (scheduled for 9:00 AM IST / Asia/Kolkata). Press Ctrl+C to stop.`);
+if (isMain) {
+  if (isDaemon) {
+    console.log(`[career-digest] Running in continuous daily daemon mode (scheduled for 9:00 AM IST / Asia/Kolkata). Press Ctrl+C to stop.`);
 
-  // Execute immediate run on startup
-  run().catch((err) => console.error("[career-digest] daemon startup run failed:", err));
+    // Execute immediate run on startup
+    run().catch((err) => console.error("[career-digest] daemon startup run failed:", err));
 
-  // Schedule daily 9 AM IST trigger using node-cron (0 9 * * *)
-  cron.schedule(
-    "0 9 * * *",
-    () => {
-      console.log("[career-digest] Triggering daily 9:00 AM IST scheduled digest run...");
-      run().catch((err) => console.error("[career-digest] daily cron run failed:", err));
-    },
-    { timezone: "Asia/Kolkata" }
-  );
-} else {
-  run().catch((err) => {
-    console.error("[career-digest] run failed:", err);
-    process.exit(1);
-  });
+    // Schedule daily 9 AM IST trigger using node-cron (0 9 * * *)
+    cron.schedule(
+      "0 9 * * *",
+      () => {
+        console.log("[career-digest] Triggering daily 9:00 AM IST scheduled digest run...");
+        run().catch((err) => console.error("[career-digest] daily cron run failed:", err));
+      },
+      { timezone: "Asia/Kolkata" }
+    );
+  } else {
+    run().catch((err) => {
+      console.error("[career-digest] run failed:", err);
+      process.exit(1);
+    });
+  }
 }
 

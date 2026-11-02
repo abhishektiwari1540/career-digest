@@ -17,20 +17,7 @@ CREATE TABLE IF NOT EXISTS system_users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Seed Abhishek Tiwari as Permanent Root Superadmin
-INSERT INTO system_users (email, password_hash, role, full_name, is_root_owner, is_active)
-VALUES (
-  'abhishektiwari1540@gmail.com',
-  crypt('12345678', gen_salt('bf', 12)),
-  'projectadmin',
-  'Abhishek Tiwari',
-  TRUE,
-  TRUE
-)
-ON CONFLICT (email) DO UPDATE SET
-  role = 'projectadmin',
-  is_root_owner = TRUE,
-  is_active = TRUE;
+-- System users table created; administrator account is securely bootstrapped at runtime via ADMIN_EMAIL and ADMIN_PASSWORD environment variables.
 
 -- 2. ACCESS & ACTIVATION REQUESTS (CLONER INGESTION QUEUE)
 CREATE TABLE IF NOT EXISTS access_requests (
@@ -117,7 +104,6 @@ CREATE OR REPLACE FUNCTION is_projectadmin()
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN (
-    auth.jwt() ->> 'email' = 'abhishektiwari1540@gmail.com' OR
     EXISTS (
       SELECT 1 FROM system_users 
       WHERE email = auth.jwt() ->> 'email' AND role = 'projectadmin'

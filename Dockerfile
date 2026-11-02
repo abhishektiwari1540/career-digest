@@ -42,5 +42,8 @@ COPY package*.json ./
 
 EXPOSE 3005
 
+# Drop root privileges for secure production execution
+USER node
+
 # Run Express server by default
 CMD ["node", "dist/src/server.js"]

@@ -47,15 +47,22 @@ export const config = {
   },
   resend: {
     apiKey: getEnv("RESEND_API_KEY", [], ""),
-    toEmail: getEnv("DIGEST_TO_EMAIL", [], "abhishekabhit57@gmail.com"),
+    toEmail: getEnv("DIGEST_TO_EMAIL", ["ADMIN_EMAIL"], "admin@yourdomain.com"),
     fromEmail: getEnv("DIGEST_FROM_EMAIL", [], "digest@yourdomain.com"),
   },
   profileSkills: (process.env.PROFILE_SKILLS ?? "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
-  candidateName: process.env.CANDIDATE_NAME ?? "Abhishek Tiwari",
-  candidateLocation: process.env.CANDIDATE_LOCATION ?? "Jaipur, Rajasthan, India",
+  candidateName: process.env.CANDIDATE_NAME ?? "OpenSource Developer",
+  candidateLocation: process.env.CANDIDATE_LOCATION ?? "Global",
+  adminEmail: getEnv("ADMIN_EMAIL", ["DIGEST_TO_EMAIL"], "admin@yourdomain.com").toLowerCase(),
+  adminPassword: process.env.ADMIN_PASSWORD ?? "",
+  jwtSecret: process.env.JWT_SECRET ?? "",
+  allowedOrigins: (process.env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
   githubUsername: process.env.GITHUB_USERNAME ?? "",
   githubToken: process.env.GITHUB_TOKEN ?? "",
   leetcodeUsername: process.env.LEETCODE_USERNAME ?? "",

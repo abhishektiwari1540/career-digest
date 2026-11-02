@@ -131,15 +131,19 @@ const __dirname = path.dirname(__filename);
 const app = express();
 initSecurityEngine();
 initDefaultWebsites();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 150 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 app.use(express.json());
 
-// Enable CORS globally for all /api endpoints (allows https://www.abhishektiwari.online to fetch blogs, SEO, and stats directly)
+// Configure CORS for /api endpoints
 app.use("/api", (req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  const allowed = (config.allowedOrigins && config.allowedOrigins.length > 0)
+    ? (origin && config.allowedOrigins.includes(origin) ? origin : config.allowedOrigins[0])
+    : "*";
+  res.setHeader("Access-Control-Allow-Origin", allowed);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE, PUT");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-second-brain-secret, x-user-id, x-user-email, Accept");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-second-brain-secret, Accept");
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -154,7 +158,8 @@ export interface AuthenticatedUserContext {
 }
 
 /**
- * Extract authenticated user context from Bearer JWT token or custom headers
+ * Extract authenticated user context strictly from verified Bearer JWT tokens.
+ * Unauthenticated header-based identity spoofing is rejected for security.
  */
 export function getAuthUser(req: express.Request): AuthenticatedUserContext | null {
   const authHeader = req.headers.authorization;
@@ -163,8 +168,8 @@ export function getAuthUser(req: express.Request): AuthenticatedUserContext | nu
     const verified = verifyAuthToken(token);
     if (verified.valid && verified.user) {
       const email = (verified.user.email || "").trim().toLowerCase();
-      const isRoot = verified.user.role === "projectadmin" || email === "abhishektiwari1540@gmail.com";
-      const uId = verified.user.id || (isRoot ? "usr_root_abhishektiwari" : `usr_${email.replace(/[^a-zA-Z0-9]/g, "_")}`);
+      const isRoot = Boolean(verified.user.is_root_owner || verified.user.role === "projectadmin");
+      const uId = verified.user.id || (isRoot ? "usr_root_admin" : `usr_${email.replace(/[^a-zA-Z0-9]/g, "_")}`);
       return {
         userId: uId,
         email,
@@ -172,20 +177,6 @@ export function getAuthUser(req: express.Request): AuthenticatedUserContext | nu
         isRootOwner: isRoot,
       };
     }
-  }
-
-  // Also check request headers (useful for internal requests / scripts)
-  const headerUserId = req.headers["x-user-id"] as string;
-  const headerEmail = (req.headers["x-user-email"] as string || "").trim().toLowerCase();
-  if (headerUserId || headerEmail) {
-    const email = headerEmail || "abhishektiwari1540@gmail.com";
-    const isRoot = email === "abhishektiwari1540@gmail.com";
-    return {
-      userId: headerUserId || (isRoot ? "usr_root_abhishektiwari" : `usr_${email.replace(/[^a-zA-Z0-9]/g, "_")}`),
-      email,
-      role: isRoot ? "projectadmin" : "engineer",
-      isRootOwner: isRoot,
-    };
   }
 
   return null;
@@ -463,6 +454,9 @@ app.get("/api/memories", async (req, res) => {
 app.post("/api/upload", upload.single("file"), async (req, res) => {
   try {
     const authUser = getAuthUser(req);
+    if (!authUser) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Valid authentication token required to ingest files." });
+    }
     const file = req.file;
     const category = (req.body.category || "auto").toLowerCase();
 
@@ -748,6 +742,10 @@ app.post("/api/generate-pack", async (req, res) => {
 // POST /api/publish-now - Manually trigger post publish to a specific platform from Web UI
 app.post("/api/publish-now", async (req, res) => {
   try {
+    const authUser = getAuthUser(req);
+    if (!authUser) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Valid authentication token required to trigger publishing." });
+    }
     const { platform, postText, topic, imageUrl } = req.body;
     let publisher = activePublishers.find((p) => p.platform === platform);
 
@@ -835,30 +833,36 @@ app.get("/api/linkedin/callback", async (req, res) => {
     config.linkedInAccessToken = accessToken;
     if (personUrn) config.linkedInPersonUrn = personUrn;
 
-    const envPath = path.join(__dirname, "../.env");
-    let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf-8") : "";
-
-    if (envContent.includes("LINKEDIN_ACCESS_TOKEN=")) {
-      envContent = envContent.replace(/LINKEDIN_ACCESS_TOKEN=.*/, `LINKEDIN_ACCESS_TOKEN=${accessToken}`);
-    } else {
-      envContent += `\nLINKEDIN_ACCESS_TOKEN=${accessToken}`;
-    }
-
-    if (personUrn) {
-      if (envContent.includes("LINKEDIN_PERSON_URN=")) {
-        envContent = envContent.replace(/LINKEDIN_PERSON_URN=.*/, `LINKEDIN_PERSON_URN=${personUrn}`);
-      } else {
-        envContent += `\nLINKEDIN_PERSON_URN=${personUrn}`;
+    // Safely update local .env file only if running in local non-production environment
+    if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
+      try {
+        const envPath = path.join(__dirname, "../.env");
+        if (fs.existsSync(envPath)) {
+          let envContent = fs.readFileSync(envPath, "utf-8");
+          if (envContent.includes("LINKEDIN_ACCESS_TOKEN=")) {
+            envContent = envContent.replace(/LINKEDIN_ACCESS_TOKEN=.*/, `LINKEDIN_ACCESS_TOKEN=${accessToken}`);
+          } else {
+            envContent += `\nLINKEDIN_ACCESS_TOKEN=${accessToken}`;
+          }
+          if (personUrn) {
+            if (envContent.includes("LINKEDIN_PERSON_URN=")) {
+              envContent = envContent.replace(/LINKEDIN_PERSON_URN=.*/, `LINKEDIN_PERSON_URN=${personUrn}`);
+            } else {
+              envContent += `\nLINKEDIN_PERSON_URN=${personUrn}`;
+            }
+          }
+          fs.writeFileSync(envPath, envContent, "utf-8");
+        }
+      } catch (fileErr: any) {
+        console.warn("[linkedin] Notice updating local .env:", fileErr.message);
       }
     }
-
-    fs.writeFileSync(envPath, envContent, "utf-8");
 
     res.send(`
       <html>
         <body style="font-family:sans-serif; background:#0f172a; color:#fff; text-align:center; padding:3rem;">
           <h1 style="color:#22c55e;">🎉 LinkedIn Connected Successfully!</h1>
-          <p>Access token and Member URN (<strong>${personUrn || 'urn:li:person:...'}</strong>) have been saved to your <strong>.env</strong> file.</p>
+          <p>Access token and Member URN (<strong>${personUrn || 'urn:li:person:...'}</strong>) have been updated.</p>
           <a href="/" style="display:inline-block; margin-top:1rem; padding:0.75rem 1.5rem; background:#3b82f6; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">Return to Web Dashboard</a>
         </body>
       </html>
@@ -2077,7 +2081,7 @@ app.post("/api/admin/revoke-instance", async (req, res) => {
 
 export default app;
 
-if (!process.env.VERCEL) {
+if (!process.env.VERCEL && process.env.NODE_ENV !== "test") {
   const PORT = process.env.PORT || 3005;
   app.listen(PORT, () => {
     console.log(`\n======================================================`);
